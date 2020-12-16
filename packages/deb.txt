@@ -1,0 +1,8 @@
+nano
+git
+catimg
+i2c-tools
+vim
+python3-pip
+python-pip
+wiringpi

@@ -3,4 +3,3 @@ dtparam=i2c_vc=on
 dtparam=spi=on
 kernel=kernel7l.img
 dtoverlay=realtimehat
-
