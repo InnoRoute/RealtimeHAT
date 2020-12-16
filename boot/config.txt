@@ -1,3 +1,4 @@
+#add this to your /boot/config.txt
 dtparam=i2c_arm=on
 dtparam=i2c_vc=on
 dtparam=spi=on
