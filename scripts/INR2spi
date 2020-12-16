@@ -1,0 +1,44 @@
+#!/bin/bash
+loopcount=50
+loopcounter=0
+write_spi(){
+	address=$( printf "%d" $1 )
+	data=$( printf "%d" $2 )
+
+	while [[ $( cat /proc/InnoRoute/SPI_write ) -gt 0 ]]
+	do
+		((loopcounter++))
+		if [[ $loopcounter -gt $loopcount ]]; then
+			echo "timeout"
+		  exit 1
+		fi
+		sleep 0.1
+	done
+	
+	echo $data > /proc/InnoRoute/SPI_data
+	echo $address > /proc/InnoRoute/SPI_write
+}
+
+read_spi(){
+address=$( printf "%d" $1 )
+while [[ $( cat /proc/InnoRoute/SPI_write ) -gt 0 ]]
+	do
+		((loopcounter++))
+		if [[ $loopcounter -gt $loopcount ]]; then
+			echo "timeout"
+		  exit 1
+		fi
+		sleep 0.1
+	done
+	echo $address > /proc/InnoRoute/SPI_read
+  echo "$(cat /proc/InnoRoute/SPI_data)"
+
+
+}
+case $# in
+  1)   read_spi $1;;
+  2)   write_spi  $1 $2;;
+  *)   echo "usage: INR2spi address <write_data>"
+  		exit 1     ;;
+
+esac

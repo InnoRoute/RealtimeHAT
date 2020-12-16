@@ -1,0 +1,32 @@
+#!/bin/bash
+echo 1 | sudo tee /proc/InnoRoute/RT_enable >/dev/null
+
+if [ "$#" -ne 1 ] ; then
+  echo "Usage: $0 bitstream.bin" >&2
+  exit 1
+fi
+i2cset -y 1 0x43 0x0B 0x00 # No Pulls
+i2cset -y 1 0x43 0x07 0xFB # All High-Z, except for PROGRAM_B
+i2cset -y 1 0x43 0x03 0x04 # Only PROGRAM_B is Output
+i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
+sleep 0.01
+i2cset -y 1 0x43 0x05 0x00 # Output 0 on PROGRAM_B
+sleep 0.01
+i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
+ret=$(i2cget -y 1 0x43 15)
+if (( ret != 0x8 ))
+		then
+  		echo "error: FPGA not in programming mode"
+  		exit 1
+fi
+
+sudo dd if=$1 of=/proc/InnoRoute/SPI_file bs=128 status=progress # Multiples of 32 bits
+ret=$(i2cget -y 1 0x43 15)
+if (( ret != 0x18 ))
+		then
+  		echo "error: write to FPGA not succesfull"
+  		exit 1
+fi
+echo "done"
+echo "beware of the green light :D"
+exit 0

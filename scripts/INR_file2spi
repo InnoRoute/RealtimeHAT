@@ -1,0 +1,8 @@
+#!/bin/bash
+
+case $# in
+  1)   dd if=$1 of=/proc/InnoRoute/SPI_file bs=512;;
+  *)   echo "usage: INR_spi2spi <file2send>"
+  		exit 1     ;;
+
+esac
