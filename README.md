@@ -1,4 +1,4 @@
-RealTimeHAT™
+Real-Time HAT™
 ===
 Documentation and source for InnoRoutes Raspberry TSN addon HAT
 
