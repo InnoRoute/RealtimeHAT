@@ -1,4 +1,4 @@
-RealTimeHAT
+RealTimeHAT™
 ===
 Documentation and source for InnoRoutes Raspberry TSN addon HAT
 
@@ -10,4 +10,4 @@ Or download the [System Description](https://innoroute.com/download/systemdescri
 Note: All software and configuration to get your RealTime-HAT running is stored here on github, so this project will be alive forever, even if InnoRoute's server-structure changes.
 
 
-Get your RealTimeHAT: http://shop.innoroute.eu
+Get your RealTimeHAT™: http://shop.innoroute.eu
