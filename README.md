@@ -11,3 +11,6 @@ Note: All software and configuration to get your RealTime-HAT running is stored 
 
 
 Get your RealTimeHAT™: http://shop.innoroute.eu
+
+## RealTime HAT automotive 
+<img src="https://github.com/InnoRoute/RealtimeHAT/wiki/pictures/sp-eth-hat.png" alt="RealtimeHAT automotive" width="50%"/>
