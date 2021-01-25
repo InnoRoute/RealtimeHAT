@@ -3,34 +3,17 @@
 echo 1 | sudo tee /proc/InnoRoute/RT_enable
 
 ## Load bitstream:
-#sudo i2cset -y 1 0x43 0x11 0xff # Disable all interrupts
-sudo i2cset -y 1 0x43 0x0B 0x00 # No Pulls
-sudo i2cset -y 1 0x43 0x07 0xFB # All High-Z, except for PROGRAM_B
-sudo i2cset -y 1 0x43 0x03 0x04 # Only PROGRAM_B is Output
-sudo i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
-sleep 0.01
-sudo i2cset -y 1 0x43 0x05 0x00 # Output 0 on PROGRAM_B
-sleep 0.01
-sudo i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
-sudo i2cget -y 1 0x43 15
-# Continue only, if 0x08
-sudo dd if=/usr/share/InnoRoute/selftest.bit of=/proc/InnoRoute/SPI_file bs=128 status=progress # Multiples of 32 bits
-sudo i2cget -y 1 0x43 15
-# Completed, if 0x18
-# Debugging: 0x00 -> INIT_B=Low: Error
-# Debugging: 0x08 -> INIT_B=HIGH: Programming did not complete -> Timeout?
-
-## Reset sequence for PHYs
-sudo /usr/share/InnoRoute/INR2spi 0x0F0C1800 0
-sudo /usr/share/InnoRoute/INR2spi 0x0F0C1900 0
-sudo /usr/share/InnoRoute/INR2spi 0x0F0C1900 2048
-sleep 2
-
+echo "flashing FPGA via SPI..."
+/usr/share/InnoRoute/INR_write_bitstream  /usr/share/InnoRoute/selftest.bit || exit 1
+echo "FPGA successfully programmed"
 ## Running adapted MDIO script, with pins (4, 17)
-echo "testing MDIO..."
-sudo python3 /usr/share/InnoRoute/mdio_test.py
+echo "configuring PHYs via MDIO..."
+sudo /usr/share/InnoRoute/INR2spi 0x0f0C1700 0x3 #C_SUB_ADDR_SPI_RESET=3
+sleep 2
+sudo python3 /usr/share/InnoRoute/phy_mdio.py >/dev/null
 
 ## Read all SPI registers:
+echo "read FPGA status via SPI..."
 for i in `seq 0 26`; do
   case "$i" in
     0 ) printf "BOARD_REV/EFUSE";;

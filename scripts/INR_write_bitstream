@@ -17,7 +17,7 @@ ret=$(i2cget -y 1 0x43 15)
 if (( ret != 0x8 ))
 		then
   		echo "error: FPGA not in programming mode"
-  		exit 1
+#  		exit 1
 fi
 
 sudo dd if=$1 of=/proc/InnoRoute/SPI_file bs=128 status=progress # Multiples of 32 bits
@@ -28,6 +28,5 @@ if (( ret != 0x18 ))
   		exit 1
 fi
 echo "done"
-echo "beware of the green light :D"
 exit 0
 
