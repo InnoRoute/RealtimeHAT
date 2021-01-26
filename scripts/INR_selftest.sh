@@ -47,3 +47,27 @@ for i in `seq 0 26`; do
   printf "0x3C0C%02x00: " $i;
   sudo /usr/share/InnoRoute/INR2spi `printf "0x3C0C%02x00" $i`;
 done;
+## network testing
+echo "testing network..."
+echo "For the network test, you will need two (short) ethernet cables."
+echo "Connect Port#0 and Port#2 of your Realtime-HAT."
+echo "Connect Port#1 of your Realtime-HAT to the RaspberryPI."
+read -p "Continue (y/n)?" CONT
+if [ "$CONT" = "y" ]; then
+  echo "ok, lets start...";
+else
+  echo "ok, good bye"
+  exit 0
+fi
+echo "generating traffic..."
+sudo tcpdump -c100 -i eth0 ether proto 0x0666 | grep "ethertype" > dump.txt&
+sudo mz eth0 -c110  -d 100m -A rand  -a rand -b rand  -p 100 "06:66"
+echo "searching for transmission errors"
+pkgcount=$(cat dump.txt | cut -d ' ' -f2,6 | uniq -c | sed  -e 's/[ \t]*//' | cut -d ' ' -f1 | uniq -c |sed  -e 's/[ \t]*//' | cut -d ' ' -f1 | cat dump.txt | cut -d ' ' -f2,6 | uniq -c | sed  -e 's/[ \t]*//' | cut -d ' ' -f1 | uniq -c |sed  -e 's/[ \t]*//' | cut -d ' ' -f1)
+rm dump.txt
+if [ $pkgcount -eq 50 ]
+    then
+        echo "Network test successfull :)"
+    else
+        echo "Network test  not successfull :("
+fi
