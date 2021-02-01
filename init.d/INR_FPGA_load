@@ -1,0 +1,28 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides: INR_FPGA_load
+# Required-Start: $syslog
+# Required-Stop: $syslog
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Load userbitstream to FPGA on boot
+# Description:
+### END INIT INFO
+ 
+case "$1" in
+    start)
+        echo "loading userbitstream"
+        /usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/user_bitstream.bit
+        ;;
+    stop)
+        echo "unloading user bitstream"
+        /usr/share/InnoRoute/INR_write_bitstream /dev/null > /dev/null
+
+        ;;
+    *)
+        echo "Benutzt: /etc/init.d/INR_FPGA_load {start|stop}"
+        exit 1
+        ;;
+esac
+ 
+exit 0
