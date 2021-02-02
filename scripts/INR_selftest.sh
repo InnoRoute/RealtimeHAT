@@ -6,7 +6,11 @@ echo 1 | sudo tee /proc/InnoRoute/RT_enable
 echo "flashing FPGA via SPI..."
 /usr/share/InnoRoute/INR_write_bitstream  /usr/share/InnoRoute/selftest.bit || exit 1
 echo "FPGA successfully programmed"
-
+## Running adapted MDIO script, with pins (4, 17)
+echo "configuring PHYs via MDIO..."
+sudo /usr/share/InnoRoute/INR2spi 0x0f0C1700 0x3 #C_SUB_ADDR_SPI_RESET=3
+sleep 2
+sudo python3 /usr/share/InnoRoute/phy_mdio.py >/dev/null
 
 ## Read all SPI registers:
 echo "read FPGA status via SPI..."
@@ -64,9 +68,6 @@ rm dump.txt
 if [ $pkgcount -eq 50 ]
     then
         echo "Network test successfull :)"
-        
     else
         echo "Network test  not successfull :("
-        exit 1
 fi
-exit 0

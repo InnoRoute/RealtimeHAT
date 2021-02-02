@@ -25,13 +25,8 @@ ret=$(i2cget -y 1 0x43 15)
 if (( ret != 0x18 ))
 		then
   		echo "error: write to FPGA not succesfull"
-  		exit 1
+#  		exit 1
 fi
-## Running adapted MDIO script, with pins (4, 17)
-echo "configuring PHYs via MDIO..."
-sudo /usr/share/InnoRoute/INR2spi 0x0f0C1700 0x3 #C_SUB_ADDR_SPI_RESET=3
-sleep 2
-sudo python3 /usr/share/InnoRoute/phy_mdio.py >/dev/null
 echo "done"
 exit 0
 
