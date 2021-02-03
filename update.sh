@@ -13,5 +13,6 @@ fi
 git pull
 sudo rm -r /usr/share/InnoRoute
 sudo rm -r /lib/modules/5.4.44-v7l+ 
+chmod +x install.sh
 yes|./install.sh
 
