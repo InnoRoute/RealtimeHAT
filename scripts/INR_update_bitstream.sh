@@ -23,4 +23,11 @@ cat /usr/share/InnoRoute/bs_info.conf | grep "C_ADDR_" >/usr/share/InnoRoute/hat
 sudo wget $BS_file -O /usr/share/InnoRoute/user_bitstream.bit || exit 1
 echo "loading new bitstream..."
 /usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/user_bitstream.bit
+ID_0=$(sudo /usr/share/InnoRoute/INR2spi 0x3C0C0200)
+ID_0=$(printf "%d\n" $ID_0)
+if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
+    sudo modprobe INR_RTHAT
+else
+    sudo rmmod INR_RTHAT
+fi
 

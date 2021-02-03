@@ -1,0 +1,11 @@
+#!/bin/bash
+addr=$(( $1 & 0x00ffffff  ))
+case $# in
+  1)  addr=$(( $addr | 0x3c000000 ))  
+  		sudo /usr/share/InnoRoute/INR2spi $addr;;
+  2)  addr=$(( $addr | 0x0f000000 ))  
+  		sudo /usr/share/InnoRoute/INR2spi  $addr $2;;
+  *)   echo "usage: INR_spi address <write_data>"
+  		exit 1     ;;
+
+esac

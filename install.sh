@@ -22,6 +22,12 @@ echo -e "\033[0;32minstalling InnoRoute scripts\033[0m"
 sudo mkdir -p /usr/share/InnoRoute
 sudo chown pi /usr/share/InnoRoute
 cp -v -r scripts/* /usr/share/InnoRoute/
+sudo cp -v -r init.d/* /etc/init.d/
+sudo chmod +x /etc/init.d/INR*
+echo -e "\033[0;32mconfigure wlan route metric\033[0m"
+echo -e "interface wlan0\nmetric 2"| sudo tee -a /etc/dhcpcd.conf
+echo -e "\033[0;32menable autostart scripts\033[0m"
+sudo update-rc.d INR_FPGA_load defaults
 echo -e "\033[0;32minstall custom kernel\033[0m"
 tar xfv kernel/kernel.tar.gz
 sudo cp -v -r output/boot/* /boot/
