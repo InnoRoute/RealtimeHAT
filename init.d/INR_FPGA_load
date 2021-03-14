@@ -11,15 +11,7 @@
  
 case "$1" in
     start)
-        echo "loading userbitstream"
-        /usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/user_bitstream.bit 
-        ID_0=$(sudo /usr/share/InnoRoute/INR2spi 0x3C0C0200)
-        ID_0=$(printf "%d\n" $ID_0)
-        if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
-       		 	sudo modprobe INR_RTHAT
-       	else
-       			sudo rmmod INR_RTHAT
-        fi
+        /usr/share/InnoRoute/start.sh &
         ;;
     stop)
         echo "unloading user bitstream"
@@ -28,7 +20,7 @@ case "$1" in
 
         ;;
     *)
-        echo "Benutzt: /etc/init.d/INR_FPGA_load {start|stop}"
+        echo "Use: /etc/init.d/INR_FPGA_load {start|stop}"
         exit 1
         ;;
 esac

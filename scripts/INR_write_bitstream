@@ -1,10 +1,12 @@
 #!/bin/bash
+source /usr/share/InnoRoute/hat_env.sh
 echo 1 | sudo tee /proc/InnoRoute/RT_enable >/dev/null
 
 if [ "$#" -ne 1 ] ; then
   echo "Usage: $0 bitstream.bin" >&2
   exit 1
 fi
+
 i2cset -y 1 0x43 0x0B 0x00 # No Pulls
 i2cset -y 1 0x43 0x07 0xFB # All High-Z, except for PROGRAM_B
 i2cset -y 1 0x43 0x03 0x04 # Only PROGRAM_B is Output
@@ -15,23 +17,35 @@ sleep 0.01
 i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
 ret=$(i2cget -y 1 0x43 15)
 if (( ret != 0x8 ))
-		then
-  		echo "error: FPGA not in programming mode"
-#  		exit 1
+        then
+          echo "error: FPGA not in programming mode"
+#          exit 1
 fi
 
 sudo dd if=$1 of=/proc/InnoRoute/SPI_file bs=90 status=progress # Multiples of 32 bits
 ret=$(i2cget -y 1 0x43 15)
 if (( ret != 0x18 ))
-		then
-  		echo "error: write to FPGA not succesfull"
-#  		exit 1
+        then
+          echo "error: write to FPGA not succesfull"
+#          exit 1
 fi
-## Running adapted MDIO script, with pins (4, 17)
-echo "configuring PHYs via MDIO..."
-sudo /usr/share/InnoRoute/INR2spi 0x0f0C1700 0x3 #C_SUB_ADDR_SPI_RESET=3
-sleep 2
-sudo python3 /usr/share/InnoRoute/phy_mdio.py >/dev/null
-echo "done"
-exit 0
 
+echo -n "Initial SPI status: "
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_ACCESS_ERROR # SPI-Error
+sleep 20
+echo "Reseting PHYs+MMI..."
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_RESET 0x3
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_RESET 0x0 #C_SUB_ADDR_SPI_RESET=0x0
+
+sleep 1.5 # MMI Reset to MMI latency and PHY Reset to MDIO latency
+echo "Enabling frame reception..."
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_NET_ENABLE 0xF #C_SUB_ADDR_NET_ENABLE=0xF
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_NET_LINK 0xF #C_SUB_ADDR_NET_LINK=0xF
+echo -n "Final SPI status: "
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_ACCESS_ERROR
+echo "Configuring PHYs..."
+## Running adapted MDIO script, with pins (4, 17)
+sudo python3 /usr/share/InnoRoute/phy_mdio.py >/dev/null
+sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
+echo "Done"
+exit 0
