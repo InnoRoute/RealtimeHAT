@@ -12,5 +12,14 @@ Note: All software and configuration to get your RealTime-HAT running is stored 
 
 Get your RealTimeHAT™: http://shop.innoroute.eu
 
+## Clone and install
+
+```
+git clone --depth 1 https://github.com/InnoRoute/RealtimeHAT.git
+cd RealtimeHAT
+chmod +x install.sh
+./install.sh
+```
+
 ## RealTime HAT automotive 
 <img src="https://github.com/InnoRoute/RealtimeHAT/wiki/pictures/sp-eth-hat.png" alt="RealtimeHAT automotive" width="50%"/>
