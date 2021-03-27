@@ -16,19 +16,19 @@ i2cset -y 1 0x43 0x05 0x00 # Output 0 on PROGRAM_B
 sleep 0.01
 i2cset -y 1 0x43 0x05 0x04 # Output 1 on PROGRAM_B
 ret=$(i2cget -y 1 0x43 15)
-if (( ret != 0x8 ))
-        then
-          echo "error: FPGA not in programming mode"
+#if (( ret != 0x8 ))
+#        then
+#          echo "error: FPGA not in programming mode"
 #          exit 1
-fi
+#fi
 
 sudo dd if=$1 of=/proc/InnoRoute/SPI_file bs=90 status=progress # Multiples of 32 bits
 ret=$(i2cget -y 1 0x43 15)
-if (( ret != 0x18 ))
-        then
-          echo "error: write to FPGA not succesfull"
+#if (( ret != 0x18 ))
+#        then
+#          echo "error: write to FPGA not succesfull"
 #          exit 1
-fi
+#fi
 
 echo -n "Initial SPI status: "
 sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_ACCESS_ERROR # SPI-Error

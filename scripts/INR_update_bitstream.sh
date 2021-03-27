@@ -1,5 +1,6 @@
 #!/bin/bash
 echo "loading selftest bitstream..."
+sudo chmod -R a+wr /usr/share/InnoRoute
 /usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/selftest.bit
 echo "get device ID..."
 ID_0=$(sudo /usr/share/InnoRoute/INR2spi 0x3C0C0200|cut -d 'x' -f2)

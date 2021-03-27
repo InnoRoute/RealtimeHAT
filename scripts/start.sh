@@ -29,8 +29,11 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
     sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
     sleep 1
 		sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
+		sudo service systemd-timesyncd stop 
 		sudo killall ptp4l
-		sudo ptp4l -q  -i RT0 -f /usr/share/InnoRoute/ptp.conf
+		sudo killall phc2sys
+		sudo ptp4l -q  -i RT0 -f /usr/share/InnoRoute/ptp.conf &
+		sudo phc2sys -a -r --transportSpecific 0x1 &
     
     
     
