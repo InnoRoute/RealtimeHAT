@@ -1,5 +1,7 @@
 #!/bin/bash
 source /usr/share/InnoRoute/hat_env.sh
+
+
 sleep 30
 MAC_addr=$(cat /sys/class/net/eth0/address)
 MAC_RT0=$(awk 'BEGIN{FS=OFS=":";$0=ARGV[1];$NF=sprintf("%X",("0x"$NF)-1);print}' $MAC_addr)
@@ -20,6 +22,9 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
     sudo ifconfig RT2 mtu 1400
     sudo ifconfig RT0 hw ether $MAC_RT0
 		sudo ifconfig RT2 hw ether $MAC_RT2
+		sudo chmod a+rw /proc/InnoRoute/SPI_read
+		sudo chmod a+rw /proc/InnoRoute/SPI_write
+		sudo chmod a+rw /proc/InnoRoute/SPI_data
     
     sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
     sleep 1
