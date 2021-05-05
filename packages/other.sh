@@ -12,4 +12,6 @@ make -j4
 sudo make install
 cd ..
 sudo rm -r linuxptp
+sudo update-ca-certificates
+sudo c_rehash
 
