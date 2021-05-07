@@ -21,5 +21,5 @@ chmod +x install.sh
 ./install.sh
 ```
 
-## RealTime HAT automotive 
+## RealTime HAT with automotive 10/100Mb/s Single Pair Ethernet and TSN
 <img src="https://github.com/InnoRoute/RealtimeHAT/wiki/pictures/sp-eth-hat.png" alt="RealtimeHAT automotive" width="50%"/>
