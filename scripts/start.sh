@@ -18,6 +18,8 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
     sleep 1
     sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
     sleep 1
+    sudo ifconfig RT0 down
+    sudo ifconfig RT2 down
     sudo ifconfig RT0 mtu 1400
     sudo ifconfig RT2 mtu 1400
     sudo ifconfig RT0 hw ether $MAC_RT0
@@ -25,7 +27,8 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
 		sudo chmod a+rw /proc/InnoRoute/SPI_read
 		sudo chmod a+rw /proc/InnoRoute/SPI_write
 		sudo chmod a+rw /proc/InnoRoute/SPI_data
-    
+    sudo ifconfig RT0 up
+    sudo ifconfig RT2 up
     sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
     sleep 1
 		sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
