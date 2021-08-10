@@ -3,6 +3,9 @@ pip3 install pyrpio==0.0.5
 pip3 install wiringpi
 pip3 install goto-statement
 pip3 install rt-hat-inr
+pip3 install flask
+#pip3 install sysrepo
+#linuxptp
 git clone https://github.com/openil/linuxptp.git
 cd linuxptp/
 git checkout OpenIL-v1.8.1-202009 

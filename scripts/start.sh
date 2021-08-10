@@ -1,6 +1,6 @@
 #!/bin/bash
 source /usr/share/InnoRoute/hat_env.sh
-
+source /usr/share/InnoRoute/rt_hat.conf
 
 sleep 30
 MAC_addr=$(cat /sys/class/net/eth0/address)
@@ -29,13 +29,27 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
 		sudo chmod a+rw /proc/InnoRoute/SPI_data
     sudo ifconfig RT0 up
     sudo ifconfig RT2 up
+    if [ $rthat_network_mode -eq 1 ] #bridge mode
+    then
+		  sudo brctl addbr br0
+		  sudo brctl addif br0 RT0
+		  sudo brctl addif br0 RT2
+		  sudo ifconfig br0 up
+		  sudo dhclient br0
+    fi
+    if [ $rthat_network_mode -eq 2 ]  #6tree mode
+    then
+			sudo ifconfig RT2 inet6 add ${rthat_sixtreeprefix}::2/64
+			sudo ip -6 route del  ${rthat_sixtreeprefix}::/64 dev wg6t
+			sudo /etc/init.d/radvd start
+    fi
     sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
     sleep 1
 		sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
 		sudo service systemd-timesyncd stop 
 		sudo killall ptp4l
 		sudo killall phc2sys
-		sudo ptp4l -q  -i RT0 -f /usr/share/InnoRoute/ptp.conf &
+		sudo ptp4l -q  -i RT0 -i RT2 -f /usr/share/InnoRoute/ptp.conf &
 		sudo phc2sys -a -r --transportSpecific 0x1 &
     
     

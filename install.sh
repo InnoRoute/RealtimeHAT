@@ -22,6 +22,7 @@ echo -e "\033[0;32minstalling InnoRoute scripts\033[0m"
 sudo mkdir -p /usr/share/InnoRoute
 sudo chown pi /usr/share/InnoRoute
 cp -v -r scripts/* /usr/share/InnoRoute/
+sudo ln -s /usr/share/InnoRoute/check_bitstream.sh /etc/profile.d/check_bitstream.sh
 sudo cp -v -r init.d/* /etc/init.d/
 sudo chmod +x /etc/init.d/INR*
 echo -e "\033[0;32mconfigure wlan route metric\033[0m"
