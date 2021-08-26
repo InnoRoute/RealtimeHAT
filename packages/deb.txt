@@ -22,3 +22,6 @@ libssh-dev
 libpcre2-dbg
 libpcre2-dev
 cmake
+libcap-dev
+bison
+flex

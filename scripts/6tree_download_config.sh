@@ -30,10 +30,15 @@ if [ $? = 0 ]; then
 	echo "interface RT2
 {
         AdvSendAdvert on;
+        AdvDefaultPreference low;
         prefix $sixtreeprefix::1/64
         {
                 AdvOnLink on;
                 AdvAutonomous on;
+        };
+        RDNSS AF49::1
+        {
+                 AdvRDNSSLifetime 3600;
         };
 };
 " | sudo tee  /etc/radvd.conf
