@@ -1,9 +1,9 @@
 #!/bin/bash -e
 pip3 install pyrpio==0.0.5
-pip3 install wiringpi
-pip3 install goto-statement
-pip3 install rt-hat-inr
-pip3 install flask
+pip3 install --upgrade wiringpi
+pip3 install --upgrade goto-statement
+pip3 install --upgrade rt-hat-inr
+pip3 install --upgrade flask
 #pip3 install sysrepo
 #linuxptp
 git clone https://github.com/openil/linuxptp.git
