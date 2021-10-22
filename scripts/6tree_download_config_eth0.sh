@@ -40,7 +40,7 @@ fi
 	sixtreeprefix=$(sudo cat /etc/wireguard/wg6t.conf | grep "Address" | cut -d '=' -f2 | sed 's/::/-/g' | cut -d '-' -f1)
 	echo "update settings with personal prefix: $sixtreeprefix"
 ##	echo "rthat_sixtreeprefix='$sixtreeprefix'" | sudo tee -a /usr/share/InnoRoute/rt_hat.conf
-	sudo sed -i "/rthat_sixtreeprefix/crthat_sixtreeprefix='$sixtreeprefix'" /usr/share/InnoRoute/rt_hat.conf
+#	sudo sed -i "/rthat_sixtreeprefix/crthat_sixtreeprefix='$sixtreeprefix'" /usr/share/InnoRoute/rt_hat.conf
 	echo "interface eth0
 {
         AdvSendAdvert on;
