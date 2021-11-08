@@ -41,7 +41,7 @@ fi
 	echo "update settings with personal prefix: $sixtreeprefix"
 ##	echo "rthat_sixtreeprefix='$sixtreeprefix'" | sudo tee -a /usr/share/InnoRoute/rt_hat.conf
 	sudo sed -i "/rthat_sixtreeprefix/crthat_sixtreeprefix='$sixtreeprefix'" /usr/share/InnoRoute/rt_hat.conf
-	echo "interface eth0
+	echo "interface RT2
 {
         AdvSendAdvert on;
         AdvDefaultPreference low;
@@ -58,7 +58,7 @@ fi
 " | sudo tee  /etc/radvd.conf
 	echo "#!/bin/bash" | sudo tee  /etc/wireguard/wg6t_up.sh
 	echo "sleep 5" | sudo tee -a /etc/wireguard/wg6t_up.sh
-	echo "sudo ifconfig eth0 inet6 add ${sixtreeprefix}::2/64" | sudo tee -a /etc/wireguard/wg6t_up.sh
+	echo "sudo ifconfig RT2 inet6 add ${sixtreeprefix}::2/64" | sudo tee -a /etc/wireguard/wg6t_up.sh
 	echo "sudo ip -6 route del  ${sixtreeprefix}::/64 dev wg6t " | sudo tee -a /etc/wireguard/wg6t_up.sh
 	echo "sudo sysctl -w net.ipv6.conf.all.forwarding=1" | sudo tee -a /etc/wireguard/wg6t_up.sh
 	sudo chmod +x /etc/wireguard/wg6t_up.sh
