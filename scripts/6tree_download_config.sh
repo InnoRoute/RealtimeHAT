@@ -68,3 +68,8 @@ fi
 	sudo systemctl start wg-quick@wg6t
 echo "check if german-6tree root server is reachable..."
 ping6 AF49::1 -c3 
+echo "####"
+echo "Gratulations, you are now part of the 6Tree network :)"
+echo "All devices reachable via RT2 should have an Address offer also."
+echo "The default configuration allows incomming traffic from everywhere. You should apply filters to control which packets should reach your subnetwork."
+echo "Have a look at https://innoroute.com/save/#filter"

@@ -17,7 +17,7 @@ while [ $? -eq 0 ]; do
 		fi
 		rm login.php
 	wget --save-cookies cookies.txt --keep-session-cookies --post-data "mail=$mailaddress&password=$password"   https://vernetzung.innoroute.eu/login.php #--delete-after 
-	cat login.php | grep  "Invalid mail or password." && whiptail --title "wrong password" --msgbox "Password or mail address wrong. Registration under https://vernetzung.innoroute.eu/register.php. Blank mail to exit." 8 78
+	cat login.php | grep  "Invalid mail or password." && whiptail --title "wrong password" --msgbox "Password or mail address wrong. Registration under https://vernetzung.innoroute.eu/register.php. Blank mail to exit." 8 78 && whiptail --yesno "Try again?" 8 39 '' --title "Try again?" || break
 done
 wget --load-cookies cookies.txt  https://vernetzung.innoroute.eu/download_configfile.php -O wg_tmp.conf
 rm cookies.txt
@@ -68,3 +68,8 @@ fi
 	sudo systemctl start wg-quick@wg6t
 echo "check if german-6tree root server is reachable..."
 ping6 AF49::1 -c3 
+echo "####"
+echo "Gratulations, you are now part of the 6Tree network :)"
+echo "All devices reachable via eth0 should have an Address offer also."
+echo "The default configuration allows incomming traffic from everywhere. You should apply filters to control which packets should reach your subnetwork."
+echo "Have a look at https://innoroute.com/save/#filter"
