@@ -1,0 +1,32 @@
+#!/bin/sh
+
+              PREREQ=""
+              prereqs()
+              {
+                   echo "$PREREQ"
+              }
+
+              case $1 in
+              prereqs)
+                   prereqs
+                   exit 0
+                   ;;
+              esac
+
+              . /scripts/functions
+              # Begin real processing below this line
+log_success_msg "moep!"
+log_success_msg "updating..."
+echo "timer" > /sys/class/leds/led0/trigger 
+echo "20" > /sys/class/leds/led0/delay_on 
+echo "20" > /sys/class/leds/led0/delay_off 
+echo "timer" > /sys/class/leds/master/trigger 
+echo "20" > /sys/class/leds/master/delay_on 
+echo "20" > /sys/class/leds/master/delay_off 
+log_begin_msg "Begin selfupdate process"
+test -f  /usr/autoupdate.zip && unzip -p /usr/autoupdate.zip | dd of=/dev/mmcblk0 bs=1M && sync
+log_end_msg
+log_success_msg "update done, rebooting..."
+reboot -f
+
+              exit 0
