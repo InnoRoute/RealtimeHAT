@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Check if two arguments were provided
+if [ $# -ne 2 ]; then
+  echo "Error: Invalid number of arguments"
+  echo "Usage: $0 <binarynumber (eg.:0b101 or 101)> <regname.json>"
+  exit 1
+fi
+
+# Extract the binary number and register names JSON file from the command-line arguments
+binary=$1
+regname=$2
+
+# Remove the prefix '0b' if present
+if [[ "$binary" =~ ^0b ]]; then
+  binary=${binary#0b}
+fi
+
+# Reverse the binary number
+reverse_binary=$(echo "$binary" | rev)
+
+# Load register names from JSON file
+declare -A regname_map
+declare -A bit_map
+highest_end=-1
+while read -r line; do
+  name=$(echo "$line" | jq -r '.name')
+  start=$(echo "$line" | jq -r '.start')
+  end=$(echo "$line" | jq -r '.end')
+  
+  # find highest end value
+  if [ "$end" -gt "$highest_end" ]; then
+    highest_end="$end"
+  fi
+
+  for i in $(seq $start $end); do
+    if [ -n "${regname_map[$i]}" ]; then
+      regname_map[$i]+=""
+    else
+      regname_map[$i]="$name (bit $start to $end)"
+    fi
+    bit_map[$name]+=$i" "
+  done
+done < <(jq -c '.[]' "$regname")
+
+# Check if the highest end value is greater than or equal to the length of the binary number
+if [ "$highest_end" -gt "$((${#binary}-1))" ]; then
+  echo "Error: The highest subregister 'end' value in the $2 file is greater than the length of input binary number 0b$binary: highest end value ($highest_end) >  length of bit vector (0 to $((${#binary}-1)))"
+  exit 1
+fi
+
+# Print binary and hexadecimal representation of the input binary number
+printf "Register ${regname:0:-5}: 0b%s = 0x%X\n" "$binary" "$((2#$binary))"
+
+# Print binary and hexadecimal representation of each subregister
+for name in "${!bit_map[@]}"; do
+  binary_str=""
+  for i in $(echo "${bit_map[$name]}" | tr ' ' '\n' | sort -nu); do
+    bit=${reverse_binary:$i:1}
+    binary_str="$bit$binary_str"
+  done
+  printf "         |--> %s: 0b%s = 0x%X\n" "${regname_map[$i]}" "$binary_str" "$((2#$binary_str))"
+done

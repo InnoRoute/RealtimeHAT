@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Parse command-line options
+print_prefix=false
+while getopts "p" opt; do
+  case ${opt} in
+    p )
+      print_prefix=true
+      ;;
+    \? )
+      echo "Error: Invalid option -$OPTARG"
+      echo "Usage: $0 [-p (result with prefix "0b")] <hexadecimal(eg.:0x12 or 12)> <length(integer)>"
+      echo "Example usage inside a script:
+      echo "# Set the I2C bus and device address"
+      echo "I2CBUS=10"
+      echo "DEVICEADDR=0x43" 
+      echo "# Read the register values using i2cget" 
+      echo "REG07=$(i2cget -y 10 0x43 0x07)"
+      echo "# Convert the hex values to binary values - Attention: when using printf the script is only compatible without the -p flag!"
+      echo "REG07_BIN=$(INR_hex2bin ${REG07})"
+      echo "echo "Register 0x0B: $REG0B (Hex) | $(printf "%08d" $REG0B_BIN) (Bin)""
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+# Check if one or two arguments were provided
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  echo "Error: Invalid option -$OPTARG"
+  echo "Usage: $0 [-p (result with prefix "0b")] <hexadecimal(eg.:0x12 or 12)> <length(integer)>"
+  exit 1
+fi
+
+# Extract the hexadecimal number and length from the command-line arguments
+hex=$(echo "$1" | tr '[:lower:]' '[:upper:]')
+if [ $# -eq 2 ]; then
+  length=$2
+  if [[ $hex == 0X* ]] || [[ $hex == 0x* ]]; then
+    required_length=$(((${#hex}-2) * 4))
+  else
+    required_length=$((${#hex} * 4))
+  fi
+else
+  if [[ $hex == 0X* ]] || [[ $hex == 0x* ]]; then
+    length=$(((${#hex}-2) * 4))
+  else
+    length=$((${#hex} * 4))
+  fi
+  required_length=${length}  
+fi
+
+  # Remove the 0x prefix if present
+  hex=${hex#0X}
+  hex=${hex#0x}
+
+
+# Check if the length is valid
+#required_length=$((${#hex} * 4))
+if [ $length -lt $required_length ]; then
+  echo "Error: Length must be at least $required_length for hexadecimal number $hex"
+  exit 1
+fi
+
+# Convert hexadecimal to binary
+binary=$(echo "obase=2; ibase=16; $hex" | bc)
+
+# Pad binary with leading zeros to the desired length
+padded_binary=$(printf "%0${length}d" $binary)
+
+# Print the binary equivalent of the hexadecimal number with or without leading zeros
+if [ "$print_prefix" = true ]; then
+  echo "0b$padded_binary"
+else
+  echo $padded_binary
+fi
+
