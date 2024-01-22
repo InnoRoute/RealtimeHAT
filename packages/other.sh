@@ -17,10 +17,10 @@ cd ..
 sudo rm -r linuxptp
 sudo update-ca-certificates
 sudo c_rehash
-#wget https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/snapshot/iproute2-5.13.0.tar.gz
-#tar xf iproute2-5.13.0.tar.gz
-#cd iproute2-5.13.0
-#./configure
-#make -j4
-#sudo make install
+wget https://git.kernel.org/pub/scm/network/iproute2/iproute2.git/snapshot/iproute2-5.13.0.tar.gz
+tar xf iproute2-5.13.0.tar.gz
+cd iproute2-5.13.0
+./configure
+make -j4
+sudo make install
 

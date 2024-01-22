@@ -20,11 +20,6 @@ else
 fi
 echo "rthat network mode=$rthat_network_mode"
 echo "6tree prefix=$rthat_sixtreeprefix"
-grep -q -F "127.0.0.1  $(cat /etc/hostname)" /etc/hosts
-if [ $? -ne 0 ]; then
-  echo "127.0.0.1  $(cat /etc/hostname)" | sudo tee -a /etc/hosts
-fi
-test -f /usr/share/InnoRoute/TSNA_bringup && sudo /usr/share/InnoRoute/TSNA_bringup
 
                                                                
                                                                

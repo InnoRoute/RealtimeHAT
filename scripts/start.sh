@@ -2,19 +2,13 @@
 source /usr/share/InnoRoute/hat_env.sh
 source /usr/share/InnoRoute/rt_hat.conf
 
-
-
-sudo systemctl start AutoTSN
-sudo systemctl enable AutoTSN
-sleep 20
-sudo rmmod brcmfmac
-sudo modprobe brcmfmac roamoff=1 feature_disable=0x82000 # fix wifi connection issue
+sleep 30
 MAC_addr=$(cat /sys/class/net/eth0/address)
 MAC_RT0=$(awk 'BEGIN{FS=OFS=":";$0=ARGV[1];$NF=sprintf("%X",("0x"$NF)-1);print}' $MAC_addr)
 MAC_RT2=$(awk 'BEGIN{FS=OFS=":";$0=ARGV[1];$NF=sprintf("%X",("0x"$NF)-1);print}' $MAC_RT0)
 sudo ifconfig wlan0 mtu 1500
 echo "loading userbitstream"
-test -f /usr/share/InnoRoute/TSNA_bringup || /usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/user_bitstream.bit 
+/usr/share/InnoRoute/INR_write_bitstream /usr/share/InnoRoute/user_bitstream.bit 
 ID_0=$(sudo /usr/share/InnoRoute/INR2spi 0x3C0C0200)
 ID_0=$(printf "%d\n" $ID_0)
 if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
@@ -53,9 +47,10 @@ if [ "$ID_0" -gt "0" ];then #if bitstream load successfully load driver for hat
     sleep 1
 		sudo /usr/share/InnoRoute/INR2spi $C_ADDR_SPI_INT_STATUS 0x3ff
 		sudo service systemd-timesyncd stop 
-		sudo systemctl start ptp4l
-		sudo systemctl start phc2sys
-
+		sudo killall ptp4l
+		sudo killall phc2sys
+		sudo ptp4l -q  -i RT0 -i RT2 -f /usr/share/InnoRoute/ptp.conf &
+		sudo phc2sys -a -r --transportSpecific 0x1 &
     
     
     
