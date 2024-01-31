@@ -1,0 +1,2548 @@
+From 5351908efdb5d7aed7baaafb04aa08e343bf0335 Mon Sep 17 00:00:00 2001
+From: Marian Ulbricht <ulbricht@innoroute.de>
+Date: Wed, 8 Feb 2023 10:53:20 +0100
+Subject: [PATCH 1/2] InnoRouter Raspberry PI Real-time drivers. Re-based and
+ cleaned. On tag rpi-5.10.90.
+
+---
+ .../bindings/sram/innoroute,realtime-hat.yaml |  37 ++
+ .../devicetree/bindings/vendor-prefixes.yaml  |   2 +
+ MAINTAINERS                                   |   9 +
+ arch/arm/boot/dts/overlays/Makefile           |   3 +
+ .../boot/dts/overlays/realtimehat-overlay.dts |  69 +++
+ drivers/net/dsa/Kconfig                       |   2 +
+ drivers/net/dsa/Makefile                      |   1 +
+ drivers/net/dsa/inr_rt_hat/Kconfig            |  25 +
+ drivers/net/dsa/inr_rt_hat/Makefile           |   3 +
+ drivers/net/dsa/inr_rt_hat/inr_rt_env.h       |  45 ++
+ drivers/net/dsa/inr_rt_hat/inr_rt_hat.h       | 112 ++++
+ drivers/net/dsa/inr_rt_hat/rt_hat.c           | 579 ++++++++++++++++++
+ drivers/net/dsa/inr_rt_hat/rt_procfs.c        | 187 ++++++
+ drivers/net/dsa/inr_rt_hat/rt_ptp.c           | 328 ++++++++++
+ drivers/net/dsa/inr_rt_hat/rt_spi.c           | 356 +++++++++++
+ include/net/dsa.h                             |  10 +
+ net/dsa/Kconfig                               |   9 +
+ net/dsa/Makefile                              |   1 +
+ net/dsa/dsa.c                                 |  25 +
+ net/dsa/dsa2.c                                |  32 +-
+ net/dsa/dsa_priv.h                            |   2 +
+ net/dsa/slave.c                               |  17 +
+ net/dsa/tag_ar9331.c                          |   1 +
+ net/dsa/tag_brcm.c                            |   2 +
+ net/dsa/tag_dsa.c                             |   1 +
+ net/dsa/tag_edsa.c                            |   1 +
+ net/dsa/tag_gswip.c                           |   1 +
+ net/dsa/tag_innoroute.c                       | 205 +++++++
+ net/dsa/tag_ksz.c                             |   3 +
+ net/dsa/tag_lan9303.c                         |   1 +
+ net/dsa/tag_mtk.c                             |   1 +
+ net/dsa/tag_ocelot.c                          |   1 +
+ net/dsa/tag_qca.c                             |   1 +
+ net/dsa/tag_rtl4_a.c                          |   1 +
+ net/dsa/tag_sja1105.c                         |   1 +
+ net/dsa/tag_trailer.c                         |   1 +
+ 36 files changed, 2069 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sram/innoroute,realtime-hat.yaml
+ create mode 100644 arch/arm/boot/dts/overlays/realtimehat-overlay.dts
+ create mode 100644 drivers/net/dsa/inr_rt_hat/Kconfig
+ create mode 100644 drivers/net/dsa/inr_rt_hat/Makefile
+ create mode 100644 drivers/net/dsa/inr_rt_hat/inr_rt_env.h
+ create mode 100644 drivers/net/dsa/inr_rt_hat/inr_rt_hat.h
+ create mode 100644 drivers/net/dsa/inr_rt_hat/rt_hat.c
+ create mode 100644 drivers/net/dsa/inr_rt_hat/rt_procfs.c
+ create mode 100644 drivers/net/dsa/inr_rt_hat/rt_ptp.c
+ create mode 100644 drivers/net/dsa/inr_rt_hat/rt_spi.c
+ create mode 100644 net/dsa/tag_innoroute.c
+
+diff --git a/Documentation/devicetree/bindings/sram/innoroute,realtime-hat.yaml b/Documentation/devicetree/bindings/sram/innoroute,realtime-hat.yaml
+new file mode 100644
+index 000000000000..62af1b8e0261
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sram/innoroute,realtime-hat.yaml
+@@ -0,0 +1,37 @@
++# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/sram/innoroute,realtime-hat.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: InnoRoute Real-Time HAT for Raspberry-PI
++
++maintainers:
++  - Marian Ulbricht <ulbricht@innoroute.de>
++
++description: |+
++  InnoRoute Real-Time HAT for Raspberry-PI
++
++  https://innoroute.com/realtimehat/
++
++  Real-Time Communication with the Raspberry PI
++
++  Precise network timing,
++     for real time protocols such as Time-Sensitive Networking (TSN)
++  Synchronization between HATs, over the network, or with external GPS PPS
++  Stackable: allows for additional HATs attached on top
++  Simple configuration and use
++
++properties:
++  $nodename:
++    const: '/'
++  compatible:
++    oneOf:
++      - description: InnoRoute Real-Time HAT for Raspberry-PI
++        items:
++          - enum:
++              - innoroute,realtime-hat
++
++additionalProperties: true
++
++...
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.yaml b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+index 0d306469abd0..9285958007e1 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.yaml
++++ b/Documentation/devicetree/bindings/vendor-prefixes.yaml
+@@ -499,6 +499,8 @@ patternProperties:
+     description: Ingenic Semiconductor
+   "^innolux,.*":
+     description: Innolux Corporation
++  "^innoroute,.*":
++    description: InnoRoute GmbH
+   "^inside-secure,.*":
+     description: INSIDE Secure
+   "^inspur,.*":
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d82e4b9434c0..2874e139d5a8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8752,6 +8752,15 @@ F:	include/linux/mfd/ingenic-tcu.h
+ F:	sound/soc/codecs/jz47*
+ F:	sound/soc/jz4740/
+ 
++INNOROUTE ETHERNET SWITCH REAL TIME HAT FOR RASPBERRY PI
++M:	Marian Ulbricht <ulbricht@innoroute.de>
++M:	Andreas Foglar <foglar@innoroute.com>
++S:	Maintained
++F:	Documentation/devicetree/bindings/sram/innoroute,realtime-hat.yaml
++F:	arch/arm/boot/dts/overlays/realtimehat-overlay.dts
++F:	drivers/net/dsa/inr_rt_hat/
++F:	net/dsa/tag_innoroute.c
++
+ INOTIFY
+ M:	Jan Kara <jack@suse.cz>
+ R:	Amir Goldstein <amir73il@gmail.com>
+diff --git a/arch/arm/boot/dts/overlays/Makefile b/arch/arm/boot/dts/overlays/Makefile
+index b925054d95e4..c2053eaacd18 100644
+--- a/arch/arm/boot/dts/overlays/Makefile
++++ b/arch/arm/boot/dts/overlays/Makefile
+@@ -248,6 +248,9 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
+ 	wittypi.dtbo \
+ 	wm8960-soundcard.dtbo
+ 
++dtbo-$(CONFIG_INRRTHAT_BIND) += \
++	realtimehat.dtbo
++
+ targets += dtbs dtbs_install
+ targets += $(dtbo-y)
+ 
+diff --git a/arch/arm/boot/dts/overlays/realtimehat-overlay.dts b/arch/arm/boot/dts/overlays/realtimehat-overlay.dts
+new file mode 100644
+index 000000000000..2ec57c22c614
+--- /dev/null
++++ b/arch/arm/boot/dts/overlays/realtimehat-overlay.dts
+@@ -0,0 +1,69 @@
++// SPDX-License-Identifier: GPL-3.0
++
++// Distributed Switch Architecture driver for InnoRoute Realtime HAT
++// Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++
++/dts-v1/;
++/plugin/;
++
++#include <dt-bindings/gpio/gpio.h>
++
++&{/} {
++	aliases {
++		mdio-gpio1 = &mdio1;
++	};
++	mdio1: mdio@1 {
++		/* Use the generic mdio-gpio module */
++		compatible = "virtual,mdio-gpio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		/* Follow #gpio-cells = 2 */
++		gpios = <&gpio 4  GPIO_ACTIVE_HIGH   /* MDC   */
++			 &gpio 17 GPIO_ACTIVE_HIGH>; /* MDIO */
++		switch@0 {
++			compatible = "innoroute,realtime-hat";
++			status = "okay";
++			reg = <0>; // Address for the mdio bus
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				port@0 {
++					label = "port0";
++					reg = <0>;
++					fixed-link {
++						speed = <100>;
++						full-duplex;
++					};
++				};
++				port@1 {
++					label = "port1";
++					reg = <1>;
++					fixed-link {
++						speed = <100>;
++						full-duplex;
++					};
++				};
++				port@8 {
++					ethernet = <&genet>;
++					label = "cpu";
++					reg = <8>;
++				};
++			};
++			spi {
++				label = "rt_hat_irq";
++				irq_gpio = <27>;
++				chip_select = <0>;
++				bus_num = <0>;
++			};
++			ptp {
++				label = "realtime-hat";
++				max_adj = <250000000>;
++				pps = <1>;
++				rate = <0x5000000>;
++			};
++			proc {
++				label = "innoroute";
++			};
++		};
++	};
++};
+diff --git a/drivers/net/dsa/Kconfig b/drivers/net/dsa/Kconfig
+index 2451f61a38e4..b9a1847c65d6 100644
+--- a/drivers/net/dsa/Kconfig
++++ b/drivers/net/dsa/Kconfig
+@@ -58,6 +58,8 @@ source "drivers/net/dsa/qca/Kconfig"
+ 
+ source "drivers/net/dsa/sja1105/Kconfig"
+ 
++source "drivers/net/dsa/inr_rt_hat/Kconfig"
++
+ config NET_DSA_QCA8K
+ 	tristate "Qualcomm Atheros QCA8K Ethernet switch family support"
+ 	depends on NET_DSA
+diff --git a/drivers/net/dsa/Makefile b/drivers/net/dsa/Makefile
+index 4a943ccc2ca4..9dbf1066b0a2 100644
+--- a/drivers/net/dsa/Makefile
++++ b/drivers/net/dsa/Makefile
+@@ -23,3 +23,4 @@ obj-y				+= mv88e6xxx/
+ obj-y				+= ocelot/
+ obj-y				+= qca/
+ obj-y				+= sja1105/
++obj-y				+= inr_rt_hat/
+diff --git a/drivers/net/dsa/inr_rt_hat/Kconfig b/drivers/net/dsa/inr_rt_hat/Kconfig
+new file mode 100644
+index 000000000000..b7767227f8e4
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/Kconfig
+@@ -0,0 +1,25 @@
++# SPDX-License-Identifier: GPL-2.0-only
++
++config INRRTHAT_BIND
++	bool "InnoRoute Realtime HAT bus bind"
++	help
++	  Provide InnoRoute Realtime HAT device tree overlay for Raspberry PI.
++	  The device tree uses sram blob to be used by
++	   the InnoRoute Realtime HAT driver.
++	  The sram blob is design to be used as a DSA switch.
++	  The InnoRoute Realtime HAT provides a low cost TSN switch or
++	   a TSN end device.
++
++config INRRTHAT
++	tristate "InnoRoute Realtime HAT DSA support"
++	depends on NET_DSA && INRRTHAT_BIND
++	select NET_DSA_TAG_INNOROUTE
++	select NETWORK_PHY_TIMESTAMPING
++	select PTP_1588_CLOCK
++	select MDIO_GPIO
++	select BCMGENET
++	select USB_NET_SMSC95XX
++	help
++	  This driver operate the InnoRoute Realtime HAT, Raspberry PI Addon.
++	  The InnoRoute Realtime HAT driver uses a DSA switch.
++	  The switch can be use as a low cost TSN switch or as a TSN end device.
+diff --git a/drivers/net/dsa/inr_rt_hat/Makefile b/drivers/net/dsa/inr_rt_hat/Makefile
+new file mode 100644
+index 000000000000..9d1612a65307
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/Makefile
+@@ -0,0 +1,3 @@
++# SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_INRRTHAT) += inr_hat.o
++inr_hat-objs := rt_hat.o rt_ptp.o rt_spi.o rt_procfs.o
+diff --git a/drivers/net/dsa/inr_rt_hat/inr_rt_env.h b/drivers/net/dsa/inr_rt_hat/inr_rt_env.h
+new file mode 100644
+index 000000000000..abbede0bdc7b
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/inr_rt_env.h
+@@ -0,0 +1,45 @@
++/* SPDX-License-Identifier: GPL-3.0 */
++/*
++ * Registers
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#ifndef __RTHAT_ENV_H
++#define __RTHAT_ENV_H
++
++/* SPI */
++#define C_BASE_ADDR_SPI					 (0xC0000L)
++#define C_BASE_ADDR_SPI_END				 (0xFFF00L)
++#define C_BASE_ADDR_SPI_MASK				(0xFFFFFFL) // 24 bits
++#define C_ADDR_SPI_FPGA_ID0				 (0xC0200L)
++#define C_ADDR_SPI_FPGA_REV				 (0xC0500L)
++#define C_ADDR_SPI_INT_STATUS				 (0xC0900L)
++#define C_ADDR_SPI_INT_SET_EN				 (0xC0A00L)
++#define C_ADDR_SPI_INT_CLR_EN				 (0xC0B00L)
++#define C_ADDR_SPI_ACCESS_ERROR				 (0xC0F00L)
++#define C_ADDR_SPI_RESET				 (0xC1600L)
++/* NET */
++#define C_ADDR_NET_ENABLE				(0x400010L)
++#define C_ADDR_NET_LINK					(0x400020L)
++#define C_ADDR_NET_TX_CONF_L				(0x400050L)
++/* RTC */
++#define C_ADDR_RTC_BRIDGE_LOW				(0x7F0000L)
++#define C_ADDR_RTC_BRIDGE_HIGH				(0x7F0004L)
++#define C_ADDR_RTC_CTRLD_LOW				(0x7F0008L)
++#define C_ADDR_RTC_CTRLD_HIGH				(0x7F000CL)
++#define C_ADDR_RTC_CTRLD_OFFSET_LOW			(0x7F0010L)
++#define C_ADDR_RTC_CTRLD_OFFSET_HIGH			(0x7F0014L)
++#define C_ADDR_RTC_CTRLD_RATE				(0x7F0018L)
++#define C_ADDR_RTC_INTERRUPT_EN				(0x7F0020L)
++/* PPS */
++#define C_ADDR_PPS_INTERRUPT_EN				(0x7F0004L)
++/* HC */
++#define C_BASE_ADDR_HC_START				(0x800000L)
++#define C_BASE_ADDR_HC_STEP				   (0x100L)
++#define C_SUB_ADDR_HC_INTERRUPT_EN			    (0x08L)
++/* TM SCHED */
++#define C_ADDR_TM_SCHED_TAS_TICK_GRANULARITY		(0xD20444L)
++/* DEBUG */
++#define C_ADDR_DEBUG_INTERRUPT_EN			(0xF80010L)
++
++#endif /* __RTHAT_ENV_H */
+diff --git a/drivers/net/dsa/inr_rt_hat/inr_rt_hat.h b/drivers/net/dsa/inr_rt_hat/inr_rt_hat.h
+new file mode 100644
+index 000000000000..cbc1065696b4
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/inr_rt_hat.h
+@@ -0,0 +1,112 @@
++/* SPDX-License-Identifier: GPL-3.0 */
++/*
++ * Driver internal API
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#ifndef __RTHAT_SPI_PRIV_H
++#define __RTHAT_SPI_PRIV_H
++
++#include <linux/skbuff.h>
++#include <linux/device.h>
++#include <linux/interrupt.h>
++#include <linux/netdevice.h>
++#include <linux/kthread.h>
++#include <linux/proc_fs.h>
++#include <linux/spinlock.h>
++#include <linux/i2c.h>
++#include <linux/ptp_clock_kernel.h>
++#include <linux/spi/spi.h>
++#include <net/dsa.h>
++#include "inr_rt_env.h"
++
++#define RT_HAT_NUM_PORTS		(9)
++#define RT_HAT_CPU_PORT			(RT_HAT_NUM_PORTS - 1)
++#define MAX_POLL_COUNT			(16000)
++#define SPI_IPG				(20) /* nanoseconds */
++#define I2C_IPG				(10) /* milliseconds */
++/* 100 miliseconds in jiffies */
++#define PTP_TS_CHECK			(msecs_to_jiffies(100) + 1)
++#define INTERRUPT_MASK			(0x1C00) /* just HC0..2 */
++#define SPI_INT_REG_TX_CONF(n)		(0x400 << (n))
++#define WR_LOCAL			(0x0F000000L)
++#define RD_LOCAL			(0x3C000000L)
++#define WR_MMI				(0xC3000000L)
++#define RD_MMI				(0xF0000000L)
++#define C_BASE_ADDR_HC(id)		((id) * C_BASE_ADDR_HC_STEP + C_BASE_ADDR_HC_START)
++#define C_ADDR_HC_INTERRUPT_EN(id)	(C_BASE_ADDR_HC(id) + C_SUB_ADDR_HC_INTERRUPT_EN)
++#define SPI_ADDR_MASK(a)		(C_BASE_ADDR_SPI_MASK & (a))
++
++enum inr_rt_tx_conf {
++	TX_CONF_ENTRY		= 0,
++	TX_CONF_TIME_LOW	= 1,
++	TX_CONF_TIME_HIGH	= 2,
++};
++
++struct rt_hat_dev {
++	/* ETF mode bitmap */
++	u32 etf_mode[RT_HAT_CPU_PORT];
++	/* device probe remove sync */
++	spinlock_t dev_probe_lock;
++	bool dev_remove_start;
++	/* HAT version */
++	u32 hat_ver;
++	/* Base device, used as with DSA */
++	struct device *dev;
++	/* FPGA loading i2c */
++	struct i2c_client fpga_i2c_client;
++	bool fpga_enabled;
++	/* Distributed Switch Architecture */
++	struct dsa_switch ds;
++	bool dsa_enabled;
++	/* PTP */
++	struct hwtstamp_config ptp_config;
++	struct ptp_clock_info ptp_caps;
++	struct sk_buff_head ptp_list;
++	struct ptp_clock *ptp_clock;
++	spinlock_t ptp_ts_lock; /* Lock time stamp function */
++	u64 ptp_rate;
++	u64 ptp_offset;
++	u16 ptp_cur_skb_id;
++	/* SPI */
++	struct semaphore spi_lock; /* Protect access to spi */
++	struct spi_device *spi_device;
++	struct device *spi_dev;
++	const char *spi_irq_name;
++	int spi_irq_gpio;
++	bool spi_enabled;
++	bool spi_irq_requset;
++	int spi_irq_line;
++	u8 spi_chip_select;
++	s16 spi_bus_num;
++	/* proc file system */
++	struct proc_dir_entry *proc_dir;
++	const char *proc_name;
++	u32 proc_wdata;
++	u32 proc_rdata;
++	bool proc_sem;
++};
++
++static inline u32 inr_rt_spitx_conf_addr(u8 port, enum inr_rt_tx_conf reg)
++{
++	return 4 * (port * 4 + reg) + C_ADDR_NET_TX_CONF_L;
++}
++
++int inr_rt_spi_init(struct rt_hat_dev *rdev);
++void inr_rt_spi_exit(struct rt_hat_dev *rdev);
++int inr_rt_spi_file_write(struct rt_hat_dev *rdev, const void *buffer, size_t size);
++u32 inr_rt_spi_read(struct rt_hat_dev *rdev, u32 addr);
++int inr_rt_spi_write(struct rt_hat_dev *rdev, u32 addr, u32 data);
++int inr_rt_spi_read_base(struct rt_hat_dev *rdev, u32 addr, u32 *data);
++u64 inr_rt_spi_mmi_read64(struct rt_hat_dev *rdev, u32 low, u32 high);
++int inr_rt_spi_mmi_write64(struct rt_hat_dev *rdev, u64 val, u32 low, u32 high);
++int inr_rt_spi_enable_irqs(struct rt_hat_dev *rdev);
++void inr_rt_procfs_exit(struct rt_hat_dev *rdev);
++int inr_rt_procfs_init(struct rt_hat_dev *rdev);
++void inr_rt_ptp_exit(struct rt_hat_dev *rdev);
++int inr_rt_ptp_init(struct rt_hat_dev *rdev);
++void inr_rt_ptp_tstamp(struct rt_hat_dev *rdev, u8 port);
++void inr_rt_ptp_clear(struct rt_hat_dev *rdev);
++bool inr_rt_ptp_add(struct rt_hat_dev *rdev, int port, struct sk_buff *skb);
++
++#endif /* __RTHAT_SPI_PRIV_H */
+diff --git a/drivers/net/dsa/inr_rt_hat/rt_hat.c b/drivers/net/dsa/inr_rt_hat/rt_hat.c
+new file mode 100644
+index 000000000000..70f85722b9f1
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/rt_hat.c
+@@ -0,0 +1,579 @@
++// SPDX-License-Identifier: GPL-3.0
++/*
++ * Distributed Switch Architecture driver for InnoRoute Realtime HAT
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#include <net/pkt_sched.h>
++#include <linux/firmware.h>
++#include <linux/of_mdio.h>
++#include <linux/usb.h>
++#include <linux/platform_device.h>
++#include "inr_rt_hat.h"
++
++#define DEBUG 1
++#define RT_PROB "innoroute,realtime"
++
++static enum dsa_tag_protocol inr_rt_get_tag_protocol(struct dsa_switch *ds, int port,
++						     enum dsa_tag_protocol m)
++{
++	dev_info(ds->dev, "%s: port: %d\n", __func__, port);
++	if (port == RT_HAT_CPU_PORT)
++		return DSA_TAG_PROTO_INR;
++	return DSA_TAG_PROTO_NONE;
++}
++
++static int inr_rt_setup(struct dsa_switch *ds)
++{
++	dev_dbg(ds->dev, "%s: pass\n", __func__);
++	return 0;
++}
++
++static struct net_device *inr_rt_setup_cpu_port(struct dsa_switch *ds, int port,
++						const char *hint)
++{
++	struct usb_device *xdev;
++	struct net_device *ndev;
++
++	dev_info(ds->dev, "%s: port: %d\n", __func__, port);
++	if (port == RT_HAT_CPU_PORT && strcmp(hint, "rpi3") == 0) {
++		for_each_netdev(&init_net, ndev) {
++			/* Parent of net_device created by a usbnet
++			 * is a struct usb_interface.device
++			 */
++			struct device *pdev = ndev->dev.parent;
++			/* It uses a bus named 'usb' */
++			if (strcmp(pdev->bus->name, "usb") == 0) {
++				/* We know it is a USB
++				 * Fetch usb_device to compare VID/PID
++				 */
++				xdev = interface_to_usbdev(to_usb_interface(pdev));
++				/* USB\VID_0424 Microchip Technology, Inc. Formerly SMSC.
++				 * SMSC9512/9514 USB Hub & Ethernet Device
++				 */
++				if (xdev->descriptor.idVendor == 0x0424 ||
++				    xdev->descriptor.idProduct == 0xec00) {
++					get_device(&ndev->dev);
++					return ndev;
++				}
++			}
++		}
++	}
++	return NULL;
++}
++
++static int inr_rt_get_ts_info(struct dsa_switch *ds, int port, struct ethtool_ts_info *info)
++{
++	struct rt_hat_dev *rdev = ds->priv;
++#ifdef DEBUG
++	dev_dbg(ds->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	info->so_timestamping = SOF_TIMESTAMPING_TX_SOFTWARE | SOF_TIMESTAMPING_RX_SOFTWARE |
++	    SOF_TIMESTAMPING_SOFTWARE | SOF_TIMESTAMPING_TX_HARDWARE |
++	    SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE;
++	info->phc_index = ptp_clock_index(rdev->ptp_clock);
++	info->tx_types = BIT(HWTSTAMP_TX_OFF) | BIT(HWTSTAMP_TX_ON);
++	info->rx_filters = BIT(HWTSTAMP_FILTER_NONE) | BIT(HWTSTAMP_FILTER_ALL);
++	return 0;
++}
++
++static int inr_rt_setup_tc(struct dsa_switch *ds, int port, enum tc_setup_type type,
++			   void *type_data)
++{
++	struct tc_etf_qopt_offload *etf;
++	struct rt_hat_dev *rdev = ds->priv;
++
++	switch (type) {
++	case TC_SETUP_QDISC_ETF:
++		etf = type_data;
++		if (port < 0 || port >= RT_HAT_CPU_PORT || !dsa_is_user_port(ds, port) ||
++		    etf->queue < 0)
++			return -ERANGE;
++		if (etf->enable)
++			rdev->etf_mode[port] |= BIT(etf->queue);
++		else
++			rdev->etf_mode[port] &= ~BIT(etf->queue);
++		dev_dbg(ds->dev, "inr_debug: etf port %d ebable %d queue %d\n",
++			port, etf->enable, etf->queue);
++		break;
++	default:
++		return -EOPNOTSUPP;
++	}
++	return 0;
++}
++
++int inr_rt_fetch_tc(struct dsa_switch *ds, int port, enum tc_setup_type type, void *type_data)
++{
++	struct tc_etf_qopt_offload *etf;
++	struct rt_hat_dev *rdev = ds->priv;
++
++	switch (type) {
++	case TC_SETUP_QDISC_ETF:
++		etf = type_data;
++		if (port < 0 || port >= RT_HAT_CPU_PORT || !dsa_is_user_port(ds, port) ||
++		    etf->queue < 0)
++			return -ERANGE;
++		etf->enable = rdev->etf_mode[port] & BIT(etf->queue);
++		break;
++	default:
++		return -EOPNOTSUPP;
++	}
++	return 0;
++}
++
++static int inr_rt_hwtstamp_get(struct dsa_switch *ds, int port, struct ifreq *ifr)
++{
++	struct rt_hat_dev *rdev = ds->priv;
++
++	return copy_to_user(ifr->ifr_data, &rdev->ptp_config, sizeof(rdev->ptp_config)) ?
++	    -EFAULT : 0;
++}
++
++static int inr_rt_hwtstamp_set(struct dsa_switch *ds, int port, struct ifreq *ifr)
++{
++	struct hwtstamp_config config;
++	struct rt_hat_dev *rdev = ds->priv;
++	bool need_copy_back = false;
++
++	if (copy_from_user(&config, ifr->ifr_data, sizeof(config)))
++		return -EFAULT;
++	if (config.rx_filter == HWTSTAMP_FILTER_NONE)
++		return -EFAULT; // Always time stamp all incoming packets
++	if (config.rx_filter >= __HWTSTAMP_FILTER_CNT)
++		return -ERANGE;
++	if (config.rx_filter != HWTSTAMP_FILTER_ALL) {
++		// Always time stamp all incoming packets
++		config.rx_filter = HWTSTAMP_FILTER_ALL;
++		need_copy_back = true;
++	}
++	switch (config.tx_type) {
++	case HWTSTAMP_TX_OFF:
++		if (rdev->ptp_config.tx_type == HWTSTAMP_TX_ON) {
++			rdev->ptp_config.tx_type = config.tx_type;
++			inr_rt_ptp_clear(rdev);
++		}
++		break;
++	case HWTSTAMP_TX_ON:
++		rdev->ptp_config.tx_type = config.tx_type;
++		break;
++	default:
++		return -ERANGE;
++	}
++#ifdef DEBUG
++	dev_dbg(ds->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++
++	return need_copy_back &&
++	    copy_to_user(ifr->ifr_data, &config, sizeof(config)) > 0 ? -EFAULT : 0;
++}
++
++static bool inr_rt_txtstamp(struct dsa_switch *ds, int port, struct sk_buff *clone,
++			    unsigned int type)
++{
++	// DSA filter PTP packets for us
++	struct rt_hat_dev *rdev = ds->priv;
++
++	return (rdev->ptp_config.tx_type == HWTSTAMP_TX_ON &&
++		(skb_shinfo(clone)->tx_flags & SKBTX_HW_TSTAMP) &&
++		inr_rt_ptp_add(rdev, port, clone));
++}
++
++static int inr_rt_probe_hat(u32 *hat_ver, struct device_node *np)
++{
++	const char *product, *vendor, *ver;
++	int ret = of_property_read_string(np, "product", &product);
++
++	if (ret)
++		return ret;
++	ret = of_property_read_string(np, "vendor", &vendor);
++	if (ret)
++		return ret;
++	if (strcmp(product, "RealtimeHAT") || strcmp(vendor, "InnoRoute GmbH")) {
++		pr_warn("The realtime HAT is missing ...\n");
++		return -EINVAL;
++	}
++	ret = of_property_read_string(np, "product_ver", &ver);
++	if (ret)
++		return ret;
++	return kstrtou32(ver, 0, hat_ver);
++}
++
++static int inr_rt_read_cfg(struct rt_hat_dev *rdev, struct device_node *dn)
++{
++	int ret;
++	u32 val;
++	const char *label;
++	struct device_node *ptp, *spi, *proc;
++
++	ptp = of_get_child_by_name(dn, "ptp");
++	spi = of_get_child_by_name(dn, "spi");
++	proc = of_get_child_by_name(dn, "proc");
++	if (!spi || !ptp || !proc) {
++		ret = -EINVAL;
++		goto done1;
++	}
++	label = of_get_property(ptp, "label", NULL);
++	if (!label) {
++		ret = -ENODATA;
++		goto done1;
++	}
++	strncpy(rdev->ptp_caps.name, label, sizeof(rdev->ptp_caps.name));
++	rdev->ptp_caps.owner = THIS_MODULE;
++	ret = of_property_read_u32(ptp, "max_adj", &val);
++	if (ret)
++		goto done1;
++	rdev->ptp_caps.max_adj = val;
++	ret = of_property_read_u32(ptp, "pps", &val);
++	if (ret)
++		goto done1;
++	rdev->ptp_caps.pps = val;
++	ret = of_property_read_u32(ptp, "rate", &val);
++	if (ret)
++		goto done1;
++	rdev->ptp_rate = val;
++	label = of_get_property(spi, "label", NULL);
++	if (!label) {
++		ret = -ENODATA;
++		goto done1;
++	}
++	rdev->spi_irq_name = label;
++	ret = of_property_read_u32(spi, "irq_gpio", &val);
++	if (ret)
++		goto done1;
++	rdev->spi_irq_gpio = val;
++	ret = of_property_read_u32(spi, "chip_select", &val);
++	if (ret)
++		goto done1;
++	rdev->spi_chip_select = val;
++	ret = of_property_read_u32(spi, "bus_num", &val);
++	if (ret)
++		goto done1;
++	rdev->spi_bus_num = val;
++	label = of_get_property(proc, "label", NULL);
++	if (!label) {
++		ret = -ENODATA;
++		goto done1;
++	}
++	rdev->proc_name = label;
++done1:
++	if (ptp)
++		of_node_put(ptp);
++	if (spi)
++		of_node_put(spi);
++	if (proc)
++		of_node_put(proc);
++	return ret;
++}
++
++static int inr_rt_set_fpga_i2c(struct rt_hat_dev *rdev)
++{
++	struct i2c_client *ic = &rdev->fpga_i2c_client;
++	// Initialized unregister client for FPGA load
++	ic->adapter = i2c_get_adapter(1); // i2c-1
++	if (!ic->adapter)
++		return -ENODEV;
++	ic->addr = 0x43; // 7bit chip address
++	snprintf(ic->name, I2C_NAME_SIZE, "i2c-inr-%d", ic->adapter->nr);
++	return 0;
++}
++
++static int inr_rt_load_fpga(struct rt_hat_dev *rdev, bool stop)
++{
++	int ret;
++	u8 program_b = 4;
++	struct i2c_client *ic = &rdev->fpga_i2c_client;
++
++	ret = i2c_smbus_write_byte_data(ic, 11, 0); // No Pulls
++	if (ret)
++		return ret;
++	ret = i2c_smbus_write_byte_data(ic, 7, ~program_b); // All High-Z, except for PROGRAM_B
++	if (ret)
++		return ret;
++	ret = i2c_smbus_write_byte_data(ic, 3, program_b); // Only PROGRAM_B is Output
++	if (ret)
++		return ret;
++	ret = i2c_smbus_write_byte_data(ic, 5, program_b); // Output 1 on PROGRAM_B
++	if (ret)
++		return ret;
++	msleep_interruptible(I2C_IPG);
++	if (signal_pending(current))
++		return -EINTR;
++	ret = i2c_smbus_write_byte_data(ic, 5, 0); // Output 0 on PROGRAM_B
++	if (ret)
++		return ret;
++	msleep_interruptible(I2C_IPG);
++	if (signal_pending(current))
++		return -EINTR;
++	ret = i2c_smbus_write_byte_data(ic, 5, program_b); // Output 1 on PROGRAM_B
++	if (ret)
++		return ret;
++	ret = i2c_smbus_read_byte_data(ic, 15);
++	if (ret < 0)
++		return ret;
++	if (stop) { // Stop FPGA by writing zeros
++		u8 data[90] = {0};
++
++		ret = inr_rt_spi_file_write(rdev, data, sizeof(data));
++		if (ret)
++			return ret;
++	} else {
++		char name[42];
++		const struct firmware *rt_fw;
++
++		snprintf(name, sizeof(name) - 1, "inr/real-time.%d.bin", rdev->hat_ver);
++		dev_info(rdev->dev, "Loading firmware: %s ...\n", name);
++		ret = request_firmware(&rt_fw, name, rdev->dev);
++		if (ret) {
++			dev_err(rdev->dev, "ERROR: fail reading firmware");
++			return ret;
++		}
++		ret = inr_rt_spi_file_write(rdev, rt_fw->data, rt_fw->size);
++		if (ret)
++			return ret;
++		release_firmware(rt_fw);
++	}
++	ret = i2c_smbus_read_byte_data(ic, 15);
++	if (ret < 0)
++		return ret;
++	rdev->fpga_enabled = !stop;
++	return 0;
++}
++
++/* loops in seconds
++ * ret == -ERESTARTSYS for interrupt
++ * ret > 0 if condition is true
++ * ret == 0 for timeout, which we do want :-)
++ */
++#define INR_WAIT(loop)									\
++	for (i = 0; i < (loop) * 2; i++) {						\
++		ret = wait_event_interruptible_timeout(wait, (rdev->dev_remove_start),	\
++						       msecs_to_jiffies(500) + 1);	\
++		if (ret == -ERESTARTSYS || signal_pending(current) ||			\
++		    kthread_should_stop()) {						\
++			ret = -EINTR;							\
++			break;								\
++		}									\
++		if (ret > 0)								\
++			break;								\
++	}										\
++
++static int inr_rt_wait_fpga(struct rt_hat_dev *rdev)
++{
++	int ret, i;
++	u32 reg;
++	DECLARE_WAIT_QUEUE_HEAD(wait);
++
++	if (!rdev->spi_enabled)
++		return -EFAULT;
++	dev_info(rdev->dev, "Wait for FPGA ....\n");
++	reg = inr_rt_spi_read(rdev, C_ADDR_SPI_ACCESS_ERROR);
++	dev_dbg(rdev->dev, "Initial SPI status: %d", reg);
++	INR_WAIT(20); // Wait for 20 seconds
++	if (ret < 0)
++		return ret;
++	if (ret > 0)
++		return 0;
++	dev_dbg(rdev->dev, "Resetting PHYs+MMI...");
++	ret = inr_rt_spi_write(rdev, C_ADDR_SPI_RESET, 3);
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, C_ADDR_SPI_RESET, 0);
++	if (ret)
++		return ret;
++	// MMI Reset to MMI latency and PHY Reset to MDIO latency
++	INR_WAIT(1.5); // Wait for 1.5 seconds
++	if (ret < 0)
++		return ret;
++	if (ret > 0)
++		return 0;
++	dev_dbg(rdev->dev, "Enabling frame reception...");
++	ret = inr_rt_spi_write(rdev, C_ADDR_NET_ENABLE, 0xf);
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, C_ADDR_NET_LINK, 0xf);
++	if (ret)
++		return ret;
++	reg = inr_rt_spi_read(rdev, C_ADDR_SPI_ACCESS_ERROR);
++	dev_dbg(rdev->dev, "Final SPI status: %d", reg);
++	ret = inr_rt_spi_write(rdev, C_ADDR_SPI_INT_STATUS, 0x3ff);
++	if (ret)
++		return ret;
++	reg = inr_rt_spi_read(rdev, C_ADDR_SPI_FPGA_ID0);
++	if (reg == 0) {
++		dev_err(rdev->dev, "ERROR: FPGA failed to use firmware");
++		return -EIO;
++	}
++	reg = inr_rt_spi_read(rdev, C_ADDR_SPI_FPGA_REV);
++	if ((reg & 0x8000) > 0) {
++		dev_err(rdev->dev, "The FPGA was loaded with an test-bitstream. Expect everything, but no support ;)");
++		return -ENOENT;
++	}
++	return 0;
++}
++
++static int inr_rt_probe_end(void *ptr)
++{
++	int ret;
++	struct rt_hat_dev *rdev = ptr;
++
++	spin_lock(&rdev->dev_probe_lock);
++	// Wait for FPGA to start
++	// User may remove driver while we wait!
++	ret = inr_rt_wait_fpga(rdev);
++	if (ret) {
++		dev_err(rdev->dev, "Start FPGA fail");
++		goto done2;
++	}
++	if (rdev->dev_remove_start)
++		goto done2;
++	// Create the new DSA
++	ret = dsa_register_switch(&rdev->ds);
++	if (ret) {
++		dev_err(rdev->dev, "Fail register DSA");
++		goto done2;
++	}
++	rdev->dsa_enabled = true;
++	// Enable IRQs
++	ret = inr_rt_spi_enable_irqs(rdev);
++	if (ret) {
++		dev_err(rdev->dev, "Fail enabling interrupts");
++		goto done2;
++	}
++	dev_info(rdev->dev, "FPGA is load and ready\n");
++done2:
++	spin_unlock(&rdev->dev_probe_lock);
++	return ret;
++}
++
++static const struct dsa_switch_ops rt_hat_driver = {
++	.get_tag_protocol	= inr_rt_get_tag_protocol,
++	.setup			= inr_rt_setup, // We must provide
++	.setup_cpu_port		= inr_rt_setup_cpu_port,
++	.get_ts_info		= inr_rt_get_ts_info,
++	.port_setup_tc		= inr_rt_setup_tc,
++	.port_fetch_tc		= inr_rt_fetch_tc,
++	.port_hwtstamp_get	= inr_rt_hwtstamp_get,
++	.port_hwtstamp_set	= inr_rt_hwtstamp_set,
++	.port_txtstamp		= inr_rt_txtstamp,
++};
++
++static int inr_rt_probe(struct mdio_device *mdiodev)
++{
++	int ret;
++	u32 hat_ver;
++	struct rt_hat_dev *rdev;
++	struct task_struct *probe_task;
++	struct device_node *dn = of_find_node_by_path("/hat");
++	// Verify the RealtimeHAT is connected
++	if (!dn)
++		return -ENODEV;
++	ret = inr_rt_probe_hat(&hat_ver, dn);
++	of_node_put(dn);
++	if (ret)
++		return ret;
++	// Allocate realtime device
++	rdev = devm_kzalloc(&mdiodev->dev, sizeof(*rdev), GFP_KERNEL);
++	if (!rdev)
++		return -ENOMEM;
++	rdev->dev = &mdiodev->dev; // Base device
++	rdev->hat_ver = hat_ver;
++	// Set sync variables
++	spin_lock_init(&rdev->dev_probe_lock);
++	ret = inr_rt_read_cfg(rdev, mdiodev->dev.of_node);
++	if (ret)
++		return ret;
++	// Set rdev in platform device
++	dev_set_drvdata(&mdiodev->dev, rdev);
++	// Init SPI bus
++	ret = inr_rt_spi_init(rdev);
++	if (ret)
++		return ret;
++	// Upload firmware and load it to the FPGA
++	ret = inr_rt_set_fpga_i2c(rdev);
++	if (ret)
++		return ret;
++	ret = inr_rt_load_fpga(rdev, false);
++	if (ret)
++		return ret;
++	// Register user proc file system
++	ret = inr_rt_procfs_init(rdev);
++	if (ret)
++		return ret;
++	// Register the PHC
++	ret = inr_rt_ptp_init(rdev);
++	if (ret)
++		return ret;
++	// Set DSA parameters
++	rdev->ds.dev = rdev->dev; // Base device
++	rdev->ds.priv = rdev;
++	rdev->ds.slave_mii_bus = mdiodev->bus;
++	// TODO check bus PHY mask
++	rdev->ds.ops = &rt_hat_driver;
++	rdev->ds.num_ports = RT_HAT_NUM_PORTS;
++	// As we need to wait for FPGA, continue the setting in a thread
++	probe_task = kthread_run(&inr_rt_probe_end, rdev, "inr_rt_probe_end");
++	if (IS_ERR_OR_NULL(probe_task))
++		return PTR_ERR(probe_task);
++	return 0;
++}
++
++static void inr_rt_remove(struct mdio_device *mdiodev)
++{
++	struct rt_hat_dev *rdev = dev_get_drvdata(&mdiodev->dev);
++
++	if (!rdev)
++		return;
++
++	rdev->dev_remove_start = true;
++	spin_lock(&rdev->dev_probe_lock);
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	// Unregister user proc file system
++	if (rdev->proc_dir)
++		inr_rt_procfs_exit(rdev);
++	// Unregister the PHC
++	if (rdev->ptp_clock)
++		inr_rt_ptp_exit(rdev);
++	// Remove the DSA
++	if (rdev->dsa_enabled) {
++		dsa_unregister_switch(&rdev->ds);
++		rdev->dsa_enabled = false;
++	}
++	// Stop FPGA
++	if (rdev->fpga_enabled)
++		inr_rt_load_fpga(rdev, true);
++	if (rdev->fpga_i2c_client.adapter) {
++		i2c_put_adapter(rdev->fpga_i2c_client.adapter);
++		rdev->fpga_i2c_client.adapter = NULL;
++	}
++	// Remove SPI bus
++	if (rdev->spi_enabled)
++		inr_rt_spi_exit(rdev);
++	dev_info(rdev->dev, "Remove done\n");
++	spin_unlock(&rdev->dev_probe_lock);
++}
++
++static const struct of_device_id rt_match_table[] = {
++	{ .compatible = RT_PROB "-hat" },
++	{}, // sentinel
++};
++
++static struct mdio_driver rt_driver = {
++	.probe	= inr_rt_probe,
++	.remove	= inr_rt_remove,
++	.mdiodrv.driver = {
++		.name = "realtime-hat",
++		.of_match_table = rt_match_table
++	},
++};
++
++mdio_module_driver(rt_driver);
++// We must depend on Ethernet driver, so kernel must remove us before!
++MODULE_INFO(depends, "genet"); // RPI 4 Ethernet
++MODULE_INFO(depends, "smsc95xx"); // RPI 3 USB NIC
++MODULE_DEVICE_TABLE(of, rt_match_table);
++MODULE_FIRMWARE("inr/real-time.1.bin");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Marian Ulbricht");
++MODULE_DESCRIPTION("Realtime HAT driver");
+diff --git a/drivers/net/dsa/inr_rt_hat/rt_procfs.c b/drivers/net/dsa/inr_rt_hat/rt_procfs.c
+new file mode 100644
+index 000000000000..3127a6ab16e1
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/rt_procfs.c
+@@ -0,0 +1,187 @@
++// SPDX-License-Identifier: GPL-3.0
++/*
++ * proc-fs functions
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#include <linux/seq_file.h>
++#include "inr_rt_hat.h"
++
++#define BUF_SIZE (1024)
++
++static inline ssize_t inr_rt_procfs_copy_buf(char *to, const char __user *from, size_t count)
++{
++	count = min_t(size_t, count, BUF_SIZE);
++	if (copy_from_user(to, from, count))
++		return -EFAULT;
++	return count;
++}
++
++static ssize_t inr_rt_procfs_copy_num(const char __user *from, size_t count, u32 *res)
++{
++	char buf[BUF_SIZE];
++	ssize_t ret = inr_rt_procfs_copy_buf(buf, from, count);
++	*res = 0;
++	if (ret > 0)
++		sscanf(buf, "%d", res);
++	return ret;
++}
++
++// proc write function
++static ssize_t inr_rt_procfs_spi_file_write(struct file *file, const char __user *from,
++					    size_t count, loff_t *off)
++{
++	char buf[BUF_SIZE];
++	struct rt_hat_dev *rdev = PDE_DATA(file_inode(file));
++	ssize_t ret = inr_rt_procfs_copy_buf(buf, from, count);
++
++	if (ret > 0)
++		inr_rt_spi_file_write(rdev, buf, count);
++	return ret;
++}
++
++// proc print function
++static int inr_rt_procfs_spi_file_show(struct seq_file *m, void *v)
++{
++	seq_printf(m, "0x%x\n", 0);
++	return 0;
++}
++
++// proc write function
++static ssize_t inr_rt_procfs_spi_data_write(struct file *file, const char __user *from,
++					    size_t count, loff_t *off)
++{
++	u32 data;
++	struct rt_hat_dev *rdev = PDE_DATA(file_inode(file));
++	ssize_t ret = inr_rt_procfs_copy_num(from, count, &data);
++
++	if (ret > 0) {
++		rdev->proc_sem = true;
++		rdev->proc_wdata = data;
++	}
++	return ret;
++}
++
++// proc print function
++static int inr_rt_procfs_spi_data_show(struct seq_file *m, void *v)
++{
++	struct rt_hat_dev *rdev = m->private;
++
++	rdev->proc_sem = false;
++	seq_printf(m, "0x%x\n", rdev->proc_rdata);
++	return 0;
++}
++
++// proc write function
++static ssize_t inr_rt_procfs_spi_write_write(struct file *file, const char __user *from,
++					     size_t count, loff_t *off)
++{
++	u32 addr;
++	struct rt_hat_dev *rdev = PDE_DATA(file_inode(file));
++	ssize_t ret = inr_rt_procfs_copy_num(from, count, &addr);
++
++	if (ret > 0) {
++		int ret1 = inr_rt_spi_write(rdev, addr, rdev->proc_wdata);
++
++		if (ret1)
++			return ret1;
++		rdev->proc_sem = false;
++	}
++	return ret;
++}
++
++// proc print function
++static int inr_rt_procfs_spi_write_show(struct seq_file *m, void *v)
++{
++	struct rt_hat_dev *rdev = m->private;
++
++	seq_printf(m, "%i\n", rdev->proc_sem);
++	return 0;
++}
++
++// proc write function
++static ssize_t inr_rt_procfs_spi_read_write(struct file *file, const char __user *from,
++					    size_t count, loff_t *off)
++{
++	u32 addr;
++	struct rt_hat_dev *rdev = PDE_DATA(file_inode(file));
++	ssize_t ret = inr_rt_procfs_copy_num(from, count, &addr);
++
++	if (ret > 0) {
++		rdev->proc_sem = true;
++		inr_rt_spi_read_base(rdev, addr, &rdev->proc_rdata);
++	}
++	return ret;
++}
++
++// proc print function
++static int inr_rt_procfs_spi_read_show(struct seq_file *m, void *v)
++{
++	struct rt_hat_dev *rdev = m->private;
++
++	seq_printf(m, "%i\n", rdev->proc_sem);
++	return 0;
++}
++
++static bool inr_rt_procfs_add(struct rt_hat_dev *rdev, const char *name, const struct proc_ops *fo)
++{
++	if (!proc_create_data(name, 0644, rdev->proc_dir, fo, rdev)) {
++		dev_alert(rdev->dev, "Error: Could not initialize /proc/%s/%s\n",
++			  rdev->proc_name, name);
++		return false;
++	}
++	return true;
++}
++
++static void inr_rt_procfs_rm(struct rt_hat_dev *rdev, const char *name)
++{
++	remove_proc_entry(name, rdev->proc_dir);
++}
++
++#define PROC_ADD(name) inr_rt_procfs_add(rdev, #name, &inr_##name)
++#define PROC_RM(name) inr_rt_procfs_rm(rdev, #name)
++// Use fs/seq_file.c helpers
++#define PROC_OPS(name) \
++static int inr_rt_procfs_##name##_open(struct inode *inode, struct file *file) \
++{ \
++	return single_open(file, inr_rt_procfs_##name##_show, PDE_DATA(inode)); \
++} \
++static const struct proc_ops inr_##name = { \
++	.proc_open = inr_rt_procfs_##name##_open, \
++	.proc_write = inr_rt_procfs_##name##_write, \
++	.proc_read = seq_read, \
++	.proc_lseek = seq_lseek, \
++	.proc_release = single_release, \
++}
++
++PROC_OPS(spi_file);
++PROC_OPS(spi_data);
++PROC_OPS(spi_write);
++PROC_OPS(spi_read);
++
++int inr_rt_procfs_init(struct rt_hat_dev *rdev)
++{
++	rdev->proc_dir = proc_mkdir(rdev->proc_name, NULL);
++	if (!rdev->proc_dir) {
++		dev_alert(rdev->dev, "Error creating proc entry");
++		return -ENOMEM;
++	}
++	if (!PROC_ADD(spi_read) ||
++	    !PROC_ADD(spi_write) ||
++	    !PROC_ADD(spi_data) ||
++	    !PROC_ADD(spi_file)) {
++		return -ENOMEM;
++	}
++	return 0;
++}
++
++void inr_rt_procfs_exit(struct rt_hat_dev *rdev)
++{
++	PROC_RM(spi_read);
++	PROC_RM(spi_write);
++	PROC_RM(spi_data);
++	PROC_RM(spi_file);
++	remove_proc_entry(rdev->proc_name, NULL);
++	dev_dbg(rdev->dev, "/proc/%s removed\n", rdev->proc_name);
++	rdev->proc_dir = NULL;
++}
+diff --git a/drivers/net/dsa/inr_rt_hat/rt_ptp.c b/drivers/net/dsa/inr_rt_hat/rt_ptp.c
+new file mode 100644
+index 000000000000..681cea1a0557
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/rt_ptp.c
+@@ -0,0 +1,328 @@
++// SPDX-License-Identifier: GPL-3.0
++/*
++ * realtime functions
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#include "inr_rt_hat.h"
++
++#define DEBUG 1
++//#define TS_DEBUG 1
++
++static bool inr_rt_ptp_handle_tstamp(struct rt_hat_dev *rdev, u64 timestamp, u32 id)
++{
++	unsigned long flags;
++	struct sk_buff *clone, *tmp, *clone_match = NULL;
++
++	spin_lock_irqsave(&rdev->ptp_list.lock, flags);
++	skb_queue_walk_safe(&rdev->ptp_list, clone, tmp) {
++		if (*(u32 *)clone->cb != id)
++			continue;
++		__skb_unlink(clone, &rdev->ptp_list);
++		clone_match = clone;
++		break;
++	}
++	spin_unlock_irqrestore(&rdev->ptp_list.lock, flags);
++	if (!clone_match) {
++		struct skb_shared_hwtstamps skbtimestamp = {0};
++
++		skbtimestamp.hwtstamp = ns_to_ktime(timestamp);
++		skb_complete_tx_timestamp(clone_match, &skbtimestamp);
++#ifdef TS_DEBUG
++		dev_dbg(rdev->dev, "Write timestamp to skb ns: %llu\n", timestamp);
++#endif
++		dev_kfree_skb_any(clone_match);
++		return true;
++	}
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "error: TXtime got point to non exist clone skb.\n");
++#endif
++	return false;
++}
++
++/**
++ * adjust ptp frequency
++ * @brief clock running faster or slower
++ * ppb is relative to base frequency
++ */
++static int inr_rt_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
++{
++	int ret;
++	u64 freq = 1;
++	struct rt_hat_dev *rdev = container_of(ptp, struct rt_hat_dev, ptp_caps);
++	u32 incval = rdev->ptp_rate;
++	u32 diff, rem;
++	u8 neg_adj = 0;
++
++	if (ppb < 0) {
++		neg_adj = 1;
++		ppb = -ppb;
++	}
++	//rdev->ptp_rate+=ppb;
++	freq *= ppb;
++	freq <<= 1;
++	rem = do_div(freq, 1000000000ULL);
++	diff = (freq << 24) | (rem >> 3);
++	incval = neg_adj ? (incval - diff) : (incval + diff);
++	//incval+=3656;
++	ret = inr_rt_spi_write(rdev, incval, C_ADDR_RTC_CTRLD_RATE);
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "PTP adjfreq called new rate:0x%x, diff:%u ppb:%d neg:%u ret:%d\n",
++		incval, diff, ppb, neg_adj, ret);
++#endif
++	return ret;
++}
++
++/**
++ * adjust ptp clock
++ * @brief clock offset change
++ */
++static int inr_rt_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
++{
++	int ret;
++	struct rt_hat_dev *rdev = container_of(ptp, struct rt_hat_dev, ptp_caps);
++	//this is maybe not neccesarry...
++	rdev->ptp_offset += delta;
++	ret = inr_rt_spi_mmi_write64(rdev, rdev->ptp_offset, C_ADDR_RTC_CTRLD_OFFSET_LOW,
++				     C_ADDR_RTC_CTRLD_OFFSET_HIGH);
++	if (ret)
++		return ret;
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "PTP adjtime called new offset:%llu delta:%lli\n",
++		rdev->ptp_offset, delta);
++#endif
++
++	//endo of maybe not neccesarry
++	//timecounter_adjtime(&tc,delta);
++	return 0;
++}
++
++/**
++ * adjust timerequest from userspace
++ * @brief provide time
++ */
++static int inr_rt_ptp_gettime(struct ptp_clock_info *ptp, struct timespec64 *ts)
++{
++	u64 ns, br_clock_val, ctrl_clock_val;
++	struct rt_hat_dev *rdev = container_of(ptp, struct rt_hat_dev, ptp_caps);
++
++	br_clock_val = inr_rt_spi_mmi_read64(rdev, C_ADDR_RTC_BRIDGE_LOW, C_ADDR_RTC_BRIDGE_HIGH);
++	ctrl_clock_val = inr_rt_spi_mmi_read64(rdev, C_ADDR_RTC_CTRLD_LOW, C_ADDR_RTC_CTRLD_HIGH);
++	//ns=timecounter_read(&tc);
++	ns = ctrl_clock_val;
++	*ts = ns_to_timespec64(ns);
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "PTP get time called value:%lli\n", ns);
++#endif
++	return 0;
++}
++
++/**
++ * time set from userspace
++ * @brief clock running faster or slower
++ */
++static int inr_rt_ptp_settime(struct ptp_clock_info *ptp, const struct timespec64 *ts)
++{
++	int ret;
++	u64 newvalue;
++	struct rt_hat_dev *rdev = container_of(ptp, struct rt_hat_dev, ptp_caps);
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "PTP set time called value:%lli\n", timespec64_to_ns(ts));
++#endif
++
++	newvalue = timespec64_to_ns(ts);
++	ret = inr_rt_spi_mmi_write64(rdev, newvalue, C_ADDR_RTC_CTRLD_OFFSET_LOW,
++				     C_ADDR_RTC_CTRLD_OFFSET_HIGH);
++	if (ret)
++		return ret;
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "PTP adjtime called new value:%lli\n", newvalue);
++#endif
++	return 0;
++}
++
++/**
++ * enable ptp clock
++ * @brief enable ptp clock
++ */
++static int inr_rt_ptp_enable(struct ptp_clock_info *ptp, struct ptp_clock_request *rq, int on)
++{
++	return 0;
++}
++
++long inr_rt_ptp_work(struct ptp_clock_info *ptp)
++{
++	long ret = -1;
++	struct rt_hat_dev *rdev = container_of(ptp, struct rt_hat_dev, ptp_caps);
++
++	if (skb_queue_len(&rdev->ptp_list) > 0) {
++		u8 i;
++
++		spin_lock(&rdev->ptp_ts_lock);
++		for (i = 0; i < RT_HAT_CPU_PORT; i++) {
++			if (dsa_is_user_port(&rdev->ds, i))
++				inr_rt_ptp_tstamp(rdev, i);
++		}
++		if (skb_queue_len(&rdev->ptp_list))
++			ret = PTP_TS_CHECK;
++		spin_unlock(&rdev->ptp_ts_lock);
++	}
++	// No packets, we can finish
++	return ret;
++}
++
++/**
++ * Clear queued PTP packets
++ * @brief If ptp restarts, the skbs are not valid anymore and have to be removed.
++ */
++void inr_rt_ptp_clear(struct rt_hat_dev *rdev)
++{
++	int i;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++
++	skb_queue_purge(&rdev->ptp_list);
++	for (i = 0; i < 10; i++) {
++		u8 port;
++		enum inr_rt_tx_conf reg;
++
++		for (port = 0; port < RT_HAT_CPU_PORT; port++)
++			if (dsa_is_user_port(&rdev->ds, i))
++				for (reg = TX_CONF_ENTRY; reg <= TX_CONF_TIME_HIGH; reg++)
++					inr_rt_spi_read(rdev, inr_rt_spitx_conf_addr(port, reg));
++	}
++}
++
++/**
++ * request tx_confirmation timestamps from hardware
++ * @brief called from interrupt
++ */
++void inr_rt_ptp_tstamp(struct rt_hat_dev *rdev, u8 port)
++{
++	u16 poll = 0;
++	bool last = false;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	while (!last) {
++		u64 timestamp;
++		u32 id;
++
++		if (++poll > MAX_POLL_COUNT)
++			break;
++		id = inr_rt_spi_read(rdev, inr_rt_spitx_conf_addr(port, TX_CONF_ENTRY));
++		last = (id & 0x10000L) > 0;
++		id &= U16_MAX;
++		if (id == 0)
++			break;
++		timestamp = inr_rt_spi_mmi_read64(rdev,
++						  inr_rt_spitx_conf_addr(port, TX_CONF_TIME_LOW),
++						  inr_rt_spitx_conf_addr(port, TX_CONF_TIME_HIGH));
++#ifdef TS_DEBUG
++		dev_dbg(rdev->dev, "Port: %d TX entry id: %d timestamp:0x%16llx\n",
++			port, id, timestamp);
++#endif
++		inr_rt_ptp_handle_tstamp(rdev, timestamp, id);
++	}
++}
++
++/**
++ * adds an TX entry to the wait for timestamp queue
++ * @brief need to keep the skb until transmit timestamp is reported
++ */
++bool inr_rt_ptp_add(struct rt_hat_dev *rdev, int port, struct sk_buff *clone)
++{
++	if (rdev->ptp_cur_skb_id == 0 || port + rdev->ptp_cur_skb_id > U16_MAX)
++		rdev->ptp_cur_skb_id = 1;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "Net TX clone stored with id %i waiting for %i\n",
++		rdev->ptp_cur_skb_id, skb_queue_len(&rdev->ptp_list));
++#endif
++	skb_queue_tail(&rdev->ptp_list, clone);
++	skb_shinfo(clone)->tx_flags |= SKBTX_IN_PROGRESS;
++	/* used also with inr_tag->tx_confirmation_id
++	 * Use '+ port' to avoid mingle IDs among ports
++	 */
++	*(u32 *)clone->cb = rdev->ptp_cur_skb_id + port;
++	/* Start worker on first packet
++	 * worker continue until all packets are stamped
++	 */
++	spin_lock(&rdev->ptp_ts_lock);
++	if (skb_queue_len(&rdev->ptp_list) == 1)
++		ptp_schedule_worker(rdev->ptp_clock, PTP_TS_CHECK);
++	spin_unlock(&rdev->ptp_ts_lock);
++
++	if (RT_HAT_CPU_PORT + rdev->ptp_cur_skb_id > U16_MAX)
++		rdev->ptp_cur_skb_id = 1;
++	else
++		rdev->ptp_cur_skb_id += RT_HAT_CPU_PORT;
++
++	return true;
++}
++
++/**
++ * init ptp clock device
++ * @brief
++ */
++int inr_rt_ptp_init(struct rt_hat_dev *rdev)
++{
++	u64 time_granularity;
++	int ret;
++
++	if (!rdev->ptp_clock) {
++		u64 br_clock_val, ctrl_clock_val;
++		// Set PTP handlers
++		rdev->ptp_caps.adjfreq = inr_rt_ptp_adjfreq;
++		rdev->ptp_caps.adjtime = inr_rt_ptp_adjtime;
++		rdev->ptp_caps.gettime64 = inr_rt_ptp_gettime;
++		rdev->ptp_caps.settime64 = inr_rt_ptp_settime;
++		rdev->ptp_caps.enable = inr_rt_ptp_enable; // We must provide a callback
++		rdev->ptp_caps.do_aux_work = inr_rt_ptp_work;
++		// register always on TN0
++		rdev->ptp_clock = ptp_clock_register(&rdev->ptp_caps, rdev->dev);
++		if (IS_ERR(rdev->ptp_clock)) {
++			ret = PTR_ERR(rdev->ptp_clock);
++			rdev->ptp_clock = NULL;
++#ifdef TS_DEBUG
++			dev_dbg(rdev->dev, "ptp_clock_register failed\n");
++#endif
++			return ret;
++		}
++		spin_lock_init(&rdev->ptp_ts_lock);
++#ifdef TS_DEBUG
++		dev_dbg(rdev->dev, "registered PHC device\n");
++#endif
++		skb_queue_head_init(&rdev->ptp_list);
++		br_clock_val = inr_rt_spi_mmi_read64(rdev, C_ADDR_RTC_BRIDGE_LOW,
++						     C_ADDR_RTC_BRIDGE_HIGH);
++		ctrl_clock_val = inr_rt_spi_mmi_read64(rdev, C_ADDR_RTC_CTRLD_LOW,
++						       C_ADDR_RTC_CTRLD_HIGH);
++		// synchonize controlled and freeruning clock
++		inr_rt_ptp_adjtime(&rdev->ptp_caps, 0);
++	}
++	time_granularity = inr_rt_spi_read(rdev, C_ADDR_TM_SCHED_TAS_TICK_GRANULARITY);
++	if (time_granularity > 100) {
++#ifdef TS_DEBUG
++		dev_dbg(rdev->dev, "error: Strange value %lld for TAS time granularity, will be reset to 5ns",
++			time_granularity);
++#endif
++		time_granularity = 5; //plausicheck
++	}
++	rdev->ptp_rate = time_granularity << 24;
++#ifdef TS_DEBUG
++	dev_dbg(rdev->dev, "Set Clock CTRL rate to 0x%llx", rdev->ptp_rate);
++#endif
++	return 0;
++}
++
++/**
++ * del ptp clock device
++ * @brief
++ */
++void inr_rt_ptp_exit(struct rt_hat_dev *rdev)
++{
++	skb_queue_purge(&rdev->ptp_list);
++	ptp_clock_unregister(rdev->ptp_clock);
++	rdev->ptp_clock = NULL;
++}
+diff --git a/drivers/net/dsa/inr_rt_hat/rt_spi.c b/drivers/net/dsa/inr_rt_hat/rt_spi.c
+new file mode 100644
+index 000000000000..201f1766a0c5
+--- /dev/null
++++ b/drivers/net/dsa/inr_rt_hat/rt_spi.c
+@@ -0,0 +1,356 @@
++// SPDX-License-Identifier: GPL-3.0
++/*
++ * spi access and interrupts
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#include <linux/gpio.h>
++#include <linux/sched.h>
++#include <linux/delay.h>
++#include "inr_rt_hat.h"
++
++//#define DEBUG 1
++#define SPI_DEBUG 0 // By value
++#define GET_SPI_ERROR false
++
++/**
++ * nibble change function for spi communication
++ * @brief needed because FPGA swaps nibbles
++ */
++static void inr_rt_spi_nibbletwist(u32 *ptr)
++{
++	u8 i, tmp, *data = (u8 *)ptr;
++
++	for (i = 0; i < 2; i++) {
++		tmp = data[i];
++		data[i] = data[4 - i - 1];
++		data[4 - i - 1] = tmp;
++	}
++}
++
++static irqreturn_t inr_rt_spi_gpio_thread(int irq, void *ptr)
++{
++	u8 i;
++	int ret;
++	u32 interrupt_status;
++	struct rt_hat_dev *rdev = ptr;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	ret = inr_rt_spi_write(rdev, U32_MAX, C_ADDR_SPI_INT_CLR_EN);
++	if (ret) {
++		dev_err(rdev->dev, "inr_rt_spi irq fail writing spi %d\n", ret);
++		return IRQ_HANDLED;
++	}
++	interrupt_status = inr_rt_spi_read(rdev, C_ADDR_SPI_INT_STATUS);
++	//dev_dbg(rdev->dev, "INR_RTH: SPI_INT_STATUS 0x%08x\n", interrupt_status);
++	spin_lock(&rdev->ptp_ts_lock);
++	for (i = 0; i < RT_HAT_CPU_PORT; i++) {
++		if (dsa_is_user_port(&rdev->ds, i) && (interrupt_status & SPI_INT_REG_TX_CONF(i))) {
++			dev_dbg(rdev->dev, "inr_rt_spi irq txconf %d\n", i);
++			inr_rt_ptp_tstamp(rdev, i);
++		}
++	}
++	spin_unlock(&rdev->ptp_ts_lock);
++	inr_rt_spi_write(rdev, INTERRUPT_MASK, C_ADDR_SPI_INT_SET_EN);
++	return IRQ_HANDLED;
++}
++
++/**
++ * config gpio for interrupt pin
++ * @brief
++ */
++static int inr_rt_spi_config_gpio(struct rt_hat_dev *rdev)
++{
++	char name[20];
++	int ret, rpi_irq;
++
++	snprintf(name, sizeof(name), "rpi-gpio-%d", rdev->spi_irq_gpio);
++	ret = gpio_request(rdev->spi_irq_gpio, name);
++	if (ret) {
++		dev_err(rdev->dev, "gpio_request failed %d\n", ret);
++		return ret;
++	}
++	rdev->spi_irq_requset = true;
++	ret = gpio_direction_input(rdev->spi_irq_gpio);
++	if (ret) {
++		dev_err(rdev->dev, "gpio_direction_input failed %d\n", ret);
++		return ret;
++	}
++	rpi_irq = gpio_to_irq(rdev->spi_irq_gpio);
++	dev_dbg(rdev->dev, "gpio_to_irq returned %d\n", rpi_irq);
++	if (rpi_irq < 0) {
++		dev_err(rdev->dev, "gpio_to_irq failed %d\n", rpi_irq);
++		return rpi_irq;
++	}
++	ret = request_threaded_irq(rpi_irq, NULL, inr_rt_spi_gpio_thread,
++				   IRQF_TRIGGER_RISING | IRQF_ONESHOT, rdev->spi_irq_name, rdev);
++	if (ret) {
++		dev_err(rdev->dev, "request_irq failed with %d\n", ret);
++		return ret;
++	}
++	rdev->spi_irq_line = rpi_irq;
++	dev_dbg(rdev->dev, "gpio %d successful configured\n", rdev->spi_irq_gpio);
++	return 0;
++}
++
++/**
++ * interrupt pin init
++ * @brief inits the raspberry pin for FPGA interrupt
++ */
++static int inr_rt_spi_irq_init(struct rt_hat_dev *rdev)
++{
++	int ret;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	ret = inr_rt_spi_config_gpio(rdev);
++	if (ret) {
++		dev_err(rdev->dev, "Error requesting interrupt\n");
++		return ret;
++	}
++	return 0;
++}
++
++static void inr_rt_spi_irq_exit(struct rt_hat_dev *rdev)
++{
++	if (rdev->spi_irq_line)
++		free_irq(rdev->spi_irq_line, rdev);
++	rdev->spi_irq_line = 0;
++	if (rdev->spi_irq_requset)
++		gpio_free(rdev->spi_irq_gpio);
++	rdev->spi_irq_requset = false;
++}
++
++/**
++ * spi address conversion
++ * @brief automatic choose command filed for spi or mmi access
++ */
++static void inr_rt_spi_autocmd(u32 *addr, bool write)
++{
++	u32 base, ad = SPI_ADDR_MASK(*addr);
++	bool is_mmi = ad >= C_BASE_ADDR_SPI && ad <= C_BASE_ADDR_SPI_END;
++
++	if (write)
++		base = is_mmi ? WR_LOCAL : WR_MMI;
++	else
++		base = is_mmi ? RD_LOCAL : RD_MMI;
++	*addr = base + ad;
++}
++
++/**
++ * init SPI interrupts
++ * @brief init settings
++ */
++int inr_rt_spi_enable_irqs(struct rt_hat_dev *rdev)
++{
++	int ret;
++	u32 err_data = 0, err_addr = RD_LOCAL + C_ADDR_SPI_ACCESS_ERROR;
++#ifdef DEBUG
++	dev_dbg(rdev->dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	inr_rt_spi_nibbletwist(&err_addr);
++	// clear error date
++	spi_write_then_read(rdev->spi_device, &err_addr, sizeof(err_addr), &err_data,
++			    sizeof(err_data));
++	ret = inr_rt_spi_write(rdev, 0x100, C_ADDR_SPI_INT_SET_EN);
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 4, C_ADDR_HC_INTERRUPT_EN(0));
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 0, C_ADDR_HC_INTERRUPT_EN(1));
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 0, C_ADDR_HC_INTERRUPT_EN(2));
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 0, C_ADDR_RTC_INTERRUPT_EN);
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 0, C_ADDR_PPS_INTERRUPT_EN);
++	if (ret)
++		return ret;
++	ret = inr_rt_spi_write(rdev, 0, C_ADDR_DEBUG_INTERRUPT_EN);
++	return ret;
++}
++
++/**
++ * driver intern spi read function
++ * @brief called internal
++ */
++int inr_rt_spi_read_base(struct rt_hat_dev *rdev, u32 addr, u32 *data)
++{
++	int ret;
++	u8 extend = 0;
++	u32 tmp, err_data = 0;
++
++	if (!rdev->spi_enabled)
++		return 0;
++	inr_rt_spi_autocmd(&addr, false);
++	tmp = addr;
++	if ((addr & 0xf0000000) == 0xf0000000)
++		extend = 4; // insert padding bytes for MMI read command
++	inr_rt_spi_nibbletwist(&addr);
++	ret = down_killable(&rdev->spi_lock);
++	if (ret) {
++		dev_warn(rdev->dev, "WARN: lock fail %d\n", ret);
++		return ret;
++	}
++	spi_write_then_read(rdev->spi_device, &addr, sizeof(addr) + extend, data, sizeof(*data));
++	inr_rt_spi_nibbletwist(data);
++	ndelay(SPI_IPG);
++	if (GET_SPI_ERROR) {
++		u32 err_addr = RD_LOCAL + C_ADDR_SPI_ACCESS_ERROR;
++
++		inr_rt_spi_nibbletwist(&err_addr);
++		spi_write_then_read(rdev->spi_device, &err_addr, sizeof(err_addr), &err_data,
++				    sizeof(err_data));
++		inr_rt_spi_nibbletwist(&err_data);
++	}
++	up(&rdev->spi_lock);
++	if (SPI_DEBUG || err_data)
++		dev_dbg(rdev->dev, "DEBUG: spi read 0x%08x 0x%08x error:0x%08x\n",
++			tmp, *data, err_data);
++	return 0;
++}
++
++u32 inr_rt_spi_read(struct rt_hat_dev *rdev, u32 addr)
++{
++	u32 data = 0;
++
++	if (inr_rt_spi_read_base(rdev, addr, &data))
++		return 0;
++	return data;
++}
++
++/**
++ * intern spi write function
++ * @brief called internal
++ */
++int inr_rt_spi_write(struct rt_hat_dev *rdev, u32 addr, u32 data)
++{
++	int ret;
++	u8 i, *bytes, tx_buffer[8];
++
++	if (!rdev->spi_enabled)
++		return 0;
++	inr_rt_spi_autocmd(&addr, true);
++#if SPI_DEBUG == 1
++	dev_dbg(rdev->dev, "DEBUG: spi write 0x%08x 0x%08x\n", addr, data);
++#endif
++	bytes = (u8 *)&addr;
++	for (i = 0; i < 4; i++)
++		tx_buffer[i] = bytes[3 - i];
++	bytes = (u8 *)&data;
++	for (i = 0; i < 4; i++)
++		tx_buffer[i + 4] = bytes[3 - i];
++	ret = down_killable(&rdev->spi_lock);
++	if (ret)
++		return ret;
++	spi_write(rdev->spi_device, tx_buffer, sizeof(data) * 2);
++	ndelay(SPI_IPG);
++	if (GET_SPI_ERROR) {
++		u32 err_data = 0, err_addr = RD_LOCAL + C_ADDR_SPI_ACCESS_ERROR;
++
++		inr_rt_spi_nibbletwist(&err_addr);
++		spi_write_then_read(rdev->spi_device, &err_addr, sizeof(err_addr), &err_data,
++				    sizeof(err_data));
++		inr_rt_spi_nibbletwist(&err_data);
++		if (err_data)
++			dev_err(rdev->dev, "error: 0x%08x on write to addr 0x%08x data: 0x%08x\n",
++				err_data, addr, data);
++	}
++	up(&rdev->spi_lock);
++	return 0;
++}
++
++u64 inr_rt_spi_mmi_read64(struct rt_hat_dev *rdev, u32 low, u32 high)
++{
++	u32 dlow, dhigh;
++
++	if (inr_rt_spi_read_base(rdev, low, &dlow) || inr_rt_spi_read_base(rdev, high, &dhigh))
++		return 0;
++	return (u64)dhigh << 32 | dlow;
++}
++
++int inr_rt_spi_mmi_write64(struct rt_hat_dev *rdev, u64 val, u32 low, u32 high)
++{
++	int ret = inr_rt_spi_write(rdev, val & U32_MAX, low);
++
++	if (ret)
++		return ret;
++	return inr_rt_spi_write(rdev, val >> 32, high);
++}
++
++/**
++ * procfs file transfer
++ * @brief for FPGA programming
++ */
++int inr_rt_spi_file_write(struct rt_hat_dev *rdev, const void *buffer, size_t size)
++{
++	int ret;
++
++	if (!rdev->spi_enabled)
++		return 0;
++	ret = down_killable(&rdev->spi_lock);
++	if (ret)
++		return ret;
++	spi_write(rdev->spi_device, buffer, size);
++	up(&rdev->spi_lock);
++	return 0;
++}
++
++static int inr_rt_spi_match(struct device *dev, const void *data)
++{
++	struct spi_device *spi = to_spi_device(dev);
++	const struct rt_hat_dev *rdev = data;
++
++	return rdev->spi_bus_num == spi->controller->bus_num &&
++		   rdev->spi_chip_select == spi->chip_select &&
++		   !spi_controller_is_slave(spi->controller); // We want a master
++}
++
++/**
++ * spi init function
++ * @brief create spi device
++ */
++int inr_rt_spi_init(struct rt_hat_dev *rdev)
++{
++	int ret;
++
++	if (rdev->spi_enabled)
++		return 0;
++	sema_init(&rdev->spi_lock, 1);
++	dev_dbg(rdev->dev, "Enable INR-RealTime-HAT SPI Module\n");
++	rdev->spi_dev = bus_find_device(&spi_bus_type, NULL, rdev, inr_rt_spi_match);
++	if (!rdev->spi_dev) {
++		pr_err("FAILED to find proper psi device.\n");
++		return -ENODEV;
++	}
++	rdev->spi_device = to_spi_device(rdev->spi_dev);
++	ret = inr_rt_spi_irq_init(rdev);
++	if (ret)
++		return ret;
++	rdev->spi_enabled = true;
++	return 0;
++}
++
++/**
++ * spi exit
++ * @brief remove spi device
++ */
++void inr_rt_spi_exit(struct rt_hat_dev *rdev)
++{
++	u8 ch2 = 0xbb;
++
++	pr_debug("Disable INR-RealTime-HAT SPI Module\n");
++	rdev->spi_enabled = false;
++	if (!rdev->spi_device)
++		return;
++	inr_rt_spi_irq_exit(rdev);
++	spi_write(rdev->spi_device, &ch2, sizeof(ch2));
++	put_device(rdev->spi_dev);
++	rdev->spi_dev = NULL;
++	rdev->spi_device = NULL;
++}
+diff --git a/include/net/dsa.h b/include/net/dsa.h
+index 35429a140dfa..c403ca435500 100644
+--- a/include/net/dsa.h
++++ b/include/net/dsa.h
+@@ -45,6 +45,7 @@ struct phylink_link_state;
+ #define DSA_TAG_PROTO_OCELOT_VALUE		15
+ #define DSA_TAG_PROTO_AR9331_VALUE		16
+ #define DSA_TAG_PROTO_RTL4_A_VALUE		17
++#define DSA_TAG_PROTO_INR_VALUE			18
+ 
+ enum dsa_tag_protocol {
+ 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
+@@ -65,6 +66,7 @@ enum dsa_tag_protocol {
+ 	DSA_TAG_PROTO_OCELOT		= DSA_TAG_PROTO_OCELOT_VALUE,
+ 	DSA_TAG_PROTO_AR9331		= DSA_TAG_PROTO_AR9331_VALUE,
+ 	DSA_TAG_PROTO_RTL4_A		= DSA_TAG_PROTO_RTL4_A_VALUE,
++	DSA_TAG_PROTO_INR		= DSA_TAG_PROTO_INR_VALUE,
+ };
+ 
+ struct packet_type;
+@@ -106,6 +108,9 @@ struct dsa_netdevice_ops {
+ #define DSA_TAG_DRIVER_ALIAS "dsa_tag-"
+ #define MODULE_ALIAS_DSA_TAG_DRIVER(__proto)				\
+ 	MODULE_ALIAS(DSA_TAG_DRIVER_ALIAS __stringify(__proto##_VALUE))
++#define DSA_TAG_DRIVER_ALIAS_NAME "dsa_tag_name-"
++#define MODULE_ALIAS_DSA_TAG_DRIVER_NAME(name)				\
++	MODULE_ALIAS(DSA_TAG_DRIVER_ALIAS_NAME name)
+ 
+ struct dsa_skb_cb {
+ 	struct sk_buff *clone;
+@@ -433,6 +438,9 @@ struct dsa_switch_ops {
+ 						  enum dsa_tag_protocol mprot);
+ 
+ 	int	(*setup)(struct dsa_switch *ds);
++	struct net_device *(*setup_cpu_port)(struct dsa_switch *ds,
++					     int port,
++					     const char *hint);
+ 	void	(*teardown)(struct dsa_switch *ds);
+ 	u32	(*get_phy_flags)(struct dsa_switch *ds, int port);
+ 
+@@ -606,6 +614,8 @@ struct dsa_switch_ops {
+ 	void	(*port_policer_del)(struct dsa_switch *ds, int port);
+ 	int	(*port_setup_tc)(struct dsa_switch *ds, int port,
+ 				 enum tc_setup_type type, void *type_data);
++	int	(*port_fetch_tc)(struct dsa_switch *ds, int port,
++				 enum tc_setup_type type, void *type_data);
+ 
+ 	/*
+ 	 * Cross-chip operations
+diff --git a/net/dsa/Kconfig b/net/dsa/Kconfig
+index 1f9b9b11008c..b79455ad5e27 100644
+--- a/net/dsa/Kconfig
++++ b/net/dsa/Kconfig
+@@ -128,4 +128,13 @@ config NET_DSA_TAG_TRAILER
+ 	  Say Y or M if you want to enable support for tagging frames at
+ 	  with a trailed. e.g. Marvell 88E6060.
+ 
++config NET_DSA_TAG_INNOROUTE
++	tristate "Tag driver for InnoRoute timestamping"
++	help
++	  Say Y or M if you want to enable support for tagging frames with the
++	  InnoRoute realtime HAT used with the Raspberry Pi.
++	  The driver is used with InnoRoute TSN realtime hat driver.
++	  The InnoRoute TSN realtime hat enable the user to have a TSN end device
++	  or a simple TSN switch for a low cost.
++
+ endif
+diff --git a/net/dsa/Makefile b/net/dsa/Makefile
+index 4f47b2025ff5..30819e55a866 100644
+--- a/net/dsa/Makefile
++++ b/net/dsa/Makefile
+@@ -18,3 +18,4 @@ obj-$(CONFIG_NET_DSA_TAG_OCELOT) += tag_ocelot.o
+ obj-$(CONFIG_NET_DSA_TAG_QCA) += tag_qca.o
+ obj-$(CONFIG_NET_DSA_TAG_SJA1105) += tag_sja1105.o
+ obj-$(CONFIG_NET_DSA_TAG_TRAILER) += tag_trailer.o
++obj-$(CONFIG_NET_DSA_TAG_INNOROUTE) += tag_innoroute.o
+diff --git a/net/dsa/dsa.c b/net/dsa/dsa.c
+index 2131bf2b3a67..f1718e0dec74 100644
+--- a/net/dsa/dsa.c
++++ b/net/dsa/dsa.c
+@@ -113,6 +113,31 @@ const struct dsa_device_ops *dsa_tag_driver_get(int tag_protocol)
+ 	return ops;
+ }
+ 
++const struct dsa_device_ops *dsa_tag_driver_get_by_name(const char *name)
++{
++	struct dsa_tag_driver *dsa_tag_driver;
++	const struct dsa_device_ops *ops, *fops = NULL;
++
++	if (!name || *name == 0)
++		return NULL;
++
++	request_module("%s%s", DSA_TAG_DRIVER_ALIAS_NAME, name);
++
++	mutex_lock(&dsa_tag_drivers_lock);
++	list_for_each_entry(dsa_tag_driver, &dsa_tag_drivers_list, list) {
++		ops = dsa_tag_driver->ops;
++		if (strcmp(ops->name, name) == 0) {
++			if (try_module_get(dsa_tag_driver->owner))
++				fops = ops;
++			break;
++		}
++	}
++
++	mutex_unlock(&dsa_tag_drivers_lock);
++
++	return fops;
++}
++
+ void dsa_tag_driver_put(const struct dsa_device_ops *ops)
+ {
+ 	struct dsa_tag_driver *dsa_tag_driver;
+diff --git a/net/dsa/dsa2.c b/net/dsa/dsa2.c
+index 71c8ef7d4087..83c120267cd5 100644
+--- a/net/dsa/dsa2.c
++++ b/net/dsa/dsa2.c
+@@ -701,14 +701,26 @@ static int dsa_port_parse_dsa(struct dsa_port *dp)
+ 	return 0;
+ }
+ 
+-static enum dsa_tag_protocol dsa_get_tag_protocol(struct dsa_port *dp,
+-						  struct net_device *master)
++static const struct dsa_device_ops *dsa_get_tag_protocol(struct dsa_port *dp,
++							 struct net_device *master)
+ {
+ 	enum dsa_tag_protocol tag_protocol = DSA_TAG_PROTO_NONE;
+ 	struct dsa_switch *mds, *ds = dp->ds;
+ 	unsigned int mdp_upstream;
+ 	struct dsa_port *mdp;
+ 
++	/* If the user prefers to set the tag in the device tree,
++	 *  then we can ignore whether the port is a slave to another switch,
++	 *  as it is already defined in the device tree.
++	 */
++	if (dp->dn) {
++		const struct dsa_device_ops *ret;
++
++		ret = dsa_tag_driver_get_by_name(of_get_property(dp->dn, "tag", NULL));
++		if (ret)
++			return ret;
++	}
++
+ 	/* It is possible to stack DSA switches onto one another when that
+ 	 * happens the switch driver may want to know if its tagging protocol
+ 	 * is going to work in such a configuration.
+@@ -724,7 +736,7 @@ static enum dsa_tag_protocol dsa_get_tag_protocol(struct dsa_port *dp,
+ 	/* If the master device is not itself a DSA slave in a disjoint DSA
+ 	 * tree, then return immediately.
+ 	 */
+-	return ds->ops->get_tag_protocol(ds, dp->index, tag_protocol);
++	return dsa_tag_driver_get(ds->ops->get_tag_protocol(ds, dp->index, tag_protocol));
+ }
+ 
+ static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
+@@ -732,10 +744,8 @@ static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
+ 	struct dsa_switch *ds = dp->ds;
+ 	struct dsa_switch_tree *dst = ds->dst;
+ 	const struct dsa_device_ops *tag_ops;
+-	enum dsa_tag_protocol tag_protocol;
+ 
+-	tag_protocol = dsa_get_tag_protocol(dp, master);
+-	tag_ops = dsa_tag_driver_get(tag_protocol);
++	tag_ops = dsa_get_tag_protocol(dp, master);
+ 	if (IS_ERR(tag_ops)) {
+ 		if (PTR_ERR(tag_ops) == -ENOPROTOOPT)
+ 			return -EPROBE_DEFER;
+@@ -756,8 +766,10 @@ static int dsa_port_parse_cpu(struct dsa_port *dp, struct net_device *master)
+ 
+ static int dsa_port_parse_of(struct dsa_port *dp, struct device_node *dn)
+ {
++	struct dsa_switch *ds = dp->ds;
+ 	struct device_node *ethernet = of_parse_phandle(dn, "ethernet", 0);
+ 	const char *name = of_get_property(dn, "label", NULL);
++	const char *hint = of_get_property(dn, "ethernet-hint", NULL);
+ 	bool link = of_property_read_bool(dn, "link");
+ 
+ 	dp->dn = dn;
+@@ -769,6 +781,14 @@ static int dsa_port_parse_of(struct dsa_port *dp, struct device_node *dn)
+ 		if (!master)
+ 			return -EPROBE_DEFER;
+ 
++		return dsa_port_parse_cpu(dp, master);
++	} else if (hint && ds->ops->setup_cpu_port) {
++		struct net_device *master;
++
++		master = ds->ops->setup_cpu_port(ds, dp->index, hint);
++		if (!master)
++			return -EPROBE_DEFER;
++
+ 		return dsa_port_parse_cpu(dp, master);
+ 	}
+ 
+diff --git a/net/dsa/dsa_priv.h b/net/dsa/dsa_priv.h
+index 12998bf04e55..b6db7eb88938 100644
+--- a/net/dsa/dsa_priv.h
++++ b/net/dsa/dsa_priv.h
+@@ -95,6 +95,7 @@ struct dsa_slave_priv {
+ 
+ /* dsa.c */
+ const struct dsa_device_ops *dsa_tag_driver_get(int tag_protocol);
++const struct dsa_device_ops *dsa_tag_driver_get_by_name(const char *name);
+ void dsa_tag_driver_put(const struct dsa_device_ops *ops);
+ 
+ bool dsa_schedule_work(struct work_struct *work);
+@@ -179,6 +180,7 @@ int dsa_slave_suspend(struct net_device *slave_dev);
+ int dsa_slave_resume(struct net_device *slave_dev);
+ int dsa_slave_register_notifier(void);
+ void dsa_slave_unregister_notifier(void);
++int dsa_slave_fetch_tc(struct net_device *dev, enum tc_setup_type type, void *type_data);
+ 
+ static inline struct dsa_port *dsa_slave_to_port(const struct net_device *dev)
+ {
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 65b125bb3b86..3f69256ad490 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -1263,6 +1263,23 @@ static void dsa_slave_get_stats64(struct net_device *dev,
+ 	dev_fetch_sw_netstats(stats, p->stats64);
+ }
+ 
++/* Allow TAG driver to retrieve TC information from a DSA switch driver.
++ * Some TC require the TAG driver to pass information from the SKB into the TAG
++ * depending on the TC configuratin set used with port_setup_tc() callback.
++ * Though only the driver can know the proper value.
++ */
++int dsa_slave_fetch_tc(struct net_device *dev, enum tc_setup_type type, void *type_data)
++{
++	struct dsa_port *dp = dsa_slave_to_port(dev);
++	struct dsa_switch *ds = dp->ds;
++
++	if (!ds->ops->port_fetch_tc)
++		return -EOPNOTSUPP;
++
++	return ds->ops->port_fetch_tc(ds, dp->index, type, type_data);
++}
++EXPORT_SYMBOL_GPL(dsa_slave_fetch_tc);
++
+ static int dsa_slave_get_rxnfc(struct net_device *dev,
+ 			       struct ethtool_rxnfc *nfc, u32 *rule_locs)
+ {
+diff --git a/net/dsa/tag_ar9331.c b/net/dsa/tag_ar9331.c
+index 002cf7f952e2..e0f074aa32af 100644
+--- a/net/dsa/tag_ar9331.c
++++ b/net/dsa/tag_ar9331.c
+@@ -90,4 +90,5 @@ static const struct dsa_device_ops ar9331_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_AR9331);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("ar9331");
+ module_dsa_tag_driver(ar9331_netdev_ops);
+diff --git a/net/dsa/tag_brcm.c b/net/dsa/tag_brcm.c
+index e934dace3922..67ec57fea6ca 100644
+--- a/net/dsa/tag_brcm.c
++++ b/net/dsa/tag_brcm.c
+@@ -192,6 +192,7 @@ static const struct dsa_device_ops brcm_netdev_ops = {
+ 
+ DSA_TAG_DRIVER(brcm_netdev_ops);
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_BRCM);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("brcm");
+ #endif
+ 
+ #if IS_ENABLED(CONFIG_NET_DSA_TAG_BRCM_PREPEND)
+@@ -220,6 +221,7 @@ static const struct dsa_device_ops brcm_prepend_netdev_ops = {
+ 
+ DSA_TAG_DRIVER(brcm_prepend_netdev_ops);
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_BRCM_PREPEND);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("brcm-prepend");
+ #endif
+ 
+ static struct dsa_tag_driver *dsa_tag_driver_array[] =	{
+diff --git a/net/dsa/tag_dsa.c b/net/dsa/tag_dsa.c
+index 63d690a0fca6..b271c5a935f6 100644
+--- a/net/dsa/tag_dsa.c
++++ b/net/dsa/tag_dsa.c
+@@ -147,5 +147,6 @@ static const struct dsa_device_ops dsa_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_DSA);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("dsa");
+ 
+ module_dsa_tag_driver(dsa_netdev_ops);
+diff --git a/net/dsa/tag_edsa.c b/net/dsa/tag_edsa.c
+index abf70a29deb4..4e0beb504c13 100644
+--- a/net/dsa/tag_edsa.c
++++ b/net/dsa/tag_edsa.c
+@@ -198,5 +198,6 @@ static const struct dsa_device_ops edsa_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_EDSA);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("edsa");
+ 
+ module_dsa_tag_driver(edsa_netdev_ops);
+diff --git a/net/dsa/tag_gswip.c b/net/dsa/tag_gswip.c
+index 2f5bd5e338ab..e74a1946a6a5 100644
+--- a/net/dsa/tag_gswip.c
++++ b/net/dsa/tag_gswip.c
+@@ -108,5 +108,6 @@ static const struct dsa_device_ops gswip_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_GSWIP);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("gswip");
+ 
+ module_dsa_tag_driver(gswip_netdev_ops);
+diff --git a/net/dsa/tag_innoroute.c b/net/dsa/tag_innoroute.c
+new file mode 100644
+index 000000000000..f793a93133df
+--- /dev/null
++++ b/net/dsa/tag_innoroute.c
+@@ -0,0 +1,205 @@
++// SPDX-License-Identifier: GPL-3.0
++/*
++ * InnoRoute Realtime Hat DSA-tag
++ * Copyright (c) 2021 M. Ulbricht, InnoRoute GmbH
++ */
++
++#include <linux/time.h>
++#include <net/pkt_sched.h>
++#include "dsa_priv.h"
++
++//#define INR_DEBUG_RX
++//#define INR_DEBUG_TX
++//#define DEBUG
++
++#define INR_DSA_ETH_TYPE	(0x813E)
++#define INR_TAG_LEN		(24)
++
++struct inr_dsa_tag_rx // to CPU
++{
++	u16 dsa_eth_type;
++	u16 ingress_port:6;
++	u16 egress_port:6;
++	u16 proc_rsn:3;
++	u16 bad_0:1;
++	u32 bridge_timestamp;
++	u32 rx_timestamp;
++	u64 ctl_timestamp;
++	u32 reserved3;
++} __attribute__((__packed__, scalar_storage_order("big-endian")));
++struct inr_dsa_tag_tx // from CPU
++{
++	u32 dsa_eth_type:16;
++	u32 ingress_port:6;
++	u32 egress_port:6;
++	u32 stream_q:4;
++	u32 tx_timestamp;
++	u32 tx_confirmation_id;
++	u32 reserved;
++} __attribute__((__packed__, scalar_storage_order("big-endian")));
++
++/* This tag length is 4 bytes, older ones were 6 bytes, we do not
++ * handle them
++ *
++ * Tag is constructed and desconstructed using byte by byte access
++ * because the tag is placed after the MAC Source Address, which does
++ * not make it 4-bytes aligned, so this might cause unaligned accesses
++ * on most systems where this is used.
++ */
++
++/**
++ * tx function
++ * @brief inserting the DSA tag
++ */
++static struct sk_buff *inr_tag_xmit(struct sk_buff *skb, struct net_device *dev)
++{
++	// Build the tag after the MAC Source Address
++	struct tc_etf_qopt_offload etf;
++	unsigned int offset = 2 * ETH_ALEN;
++	u16 ethertype;
++	struct dsa_port *dp = dsa_slave_to_port(dev);
++	struct inr_dsa_tag_tx *inr_tag;
++	struct sk_buff *clone;
++	//u16 queue = skb_get_queue_mapping (skb);
++#ifdef DEBUG
++	netdev_dbg(dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++
++	skb_linearize(skb);
++	ethertype = ((u16)skb->data[13] << 8) + skb->data[12];
++#ifdef INR_DEBUG_TX
++	netdev_dbg(dev, "Ethertype:%x\n", ethertype);
++#endif
++
++	// from CPU
++#ifdef DEBUG
++	netdev_dbg(dev, "DEBUG: Passed %s %d por:%i\n", __func__, __LINE__, dp->index);
++#endif
++	if (skb_cow_head(skb, INR_TAG_LEN) < 0) {
++		netdev_err(dev, "tx packet dropped: cow_head\n");
++		return NULL;
++	}
++	/* The Ethernet switch we are interfaced with needs packets to be at
++	 * least 64 bytes (including FCS) otherwise they will be discarded when
++	 * they enter the switch port logic. When Broadcom tags are enabled, we
++	 * need to make sure that packets are at least 68 bytes
++	 * (including FCS and tag) because the length verification is done after
++	 * the Broadcom tag is stripped off the ingress packet.
++	 *
++	 * Let dsa_slave_xmit() free the SKB
++	 */
++	if (__skb_put_padto(skb, ETH_ZLEN + INR_TAG_LEN, false)) {
++		netdev_err(dev, "tx packet dropped: padto\n");
++		return NULL;
++	}
++	skb_push(skb, INR_TAG_LEN);
++	if (offset)
++		memmove(skb->data, skb->data + INR_TAG_LEN, offset);
++	inr_tag = (struct inr_dsa_tag_tx *)(skb->data + offset);
++	// Set DSA tag information
++	inr_tag->dsa_eth_type = INR_DSA_ETH_TYPE;
++	inr_tag->ingress_port = 0x3f;
++	inr_tag->egress_port = dp->index;
++	inr_tag->stream_q = skb->priority > 7 ? 7 : skb->priority & 7;
++	// netdev_dbg(dev, "SKB_prio:%i\n", skb->priority);
++	// ETF operate on specific queues
++	etf.queue = skb_get_queue_mapping(skb);
++	if (dsa_slave_fetch_tc(dev, TC_SETUP_QDISC_ETF, &etf) == 0 && etf.enable) {
++		struct timespec64 ts = ktime_to_timespec64(skb->tstamp);
++
++		skb->tstamp = ktime_set(0, 0);
++		inr_tag->stream_q |= 8; //need queue >= 8!!!
++		inr_tag->tx_timestamp = cpu_to_le32(ts.tv_nsec);
++#ifdef INR_DEBUG_TX
++		netdev_err(dev, "INR DSR TX PORT:%i add ts 0x%x\n", inr_tag->egress_port,
++			   inr_tag->tx_timestamp);
++#endif
++	} else {
++		inr_tag->tx_timestamp = (u32)ktime_get_real_ns() + 1000000000; // don't care
++	}
++	// Packet was marked by inr_rt_txtstamp()
++	clone = DSA_SKB_CB(skb)->clone;
++	if (clone && (skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS))
++		inr_tag->tx_confirmation_id = *(u32 *)clone->cb;
++	else
++		inr_tag->tx_confirmation_id = 0;
++	inr_tag->reserved = 0;
++#ifdef INR_DEBUG_TX
++	netdev_err(dev, "INR DSR TX PORT:%i %i conf_id:%i\n", inr_tag->egress_port, dp->index,
++		   inr_tag->tx_confirmation_id);
++#endif
++	// Now tell the master network device about the desired output queue as well
++	//skb_set_queue_mapping(skb, INR_TAG_SET_PORT_QUEUE(dp->index, queue));
++	skb_tx_timestamp(skb);
++	return skb;
++}
++
++/**
++ * rx function
++ * @brief removing the DSA tag
++ */
++static struct sk_buff *inr_tag_rcv(struct sk_buff *skb, struct net_device *dev,
++				   struct packet_type *pt)
++{
++	// skb->data points to the EtherType, the tag is right before it
++	unsigned int offset = 2;
++	struct inr_dsa_tag_rx *inr_tag;
++	struct skb_shared_hwtstamps *skbtimestamp;
++
++	skb_linearize(skb);
++#ifdef DEBUG
++	netdev_dbg(dev, "DEBUG: Passed %s %d\n", __func__, __LINE__);
++#endif
++	if (unlikely(!pskb_may_pull(skb, INR_TAG_LEN))) {
++		netdev_err(dev, "drop may pull\n");
++		return NULL;
++	}
++	inr_tag = (struct inr_dsa_tag_rx *)(skb->data - offset);
++	if (inr_tag->dsa_eth_type != INR_DSA_ETH_TYPE) {
++		netdev_err_once(dev, "drop non DSA packet\n");
++		return NULL;
++	}
++	// Handle DSA tag information
++#ifdef INR_DEBUG_RX
++	netdev_err(dev, "INR DSR RX PORT:%i\n", inr_tag->ingress_port);
++#endif
++	//if(inr_tag->egress_port != 0x3f) return NULL;
++	skb->dev = dsa_master_find_slave(dev, 0, inr_tag->ingress_port);
++	if (!skb->dev) {
++		netdev_err(dev, "drop no master dev\n");
++		return NULL;
++	}
++	// Remove InnoRoute tag and update checksum
++	skb_pull_rcsum(skb, INR_TAG_LEN);
++	// tel kernel we don't support hardware switch offloading yet
++	skb->offload_fwd_mark = 0;
++	//##timestamping
++	skbtimestamp = skb_hwtstamps(skb);
++	memset(skbtimestamp, 0, sizeof(struct skb_shared_hwtstamps));
++	skbtimestamp->hwtstamp = ns_to_ktime(inr_tag->ctl_timestamp - inr_tag->bridge_timestamp +
++		inr_tag->rx_timestamp);
++#ifdef INR_DEBUG_RX
++	netdev_err(dev, "RX: skb_ts:%llu ctl_timestamp:%llu bridge_timestamp:%u rx_timestamp:%u\n",
++		   skbtimestamp->hwtstamp, inr_tag->ctl_timestamp,
++		   inr_tag->bridge_timestamp, inr_tag->rx_timestamp);
++#endif
++	__net_timestamp(skb);
++	// Move the Ethernet DA and SA
++	memmove(skb->data - ETH_HLEN, skb->data - ETH_HLEN - INR_TAG_LEN, 2 * ETH_ALEN);
++	return skb;
++}
++
++static const struct dsa_device_ops inr_netdev_ops = {
++	.name = "inr",
++	.proto = DSA_TAG_PROTO_INR,
++	.xmit = inr_tag_xmit,
++	.rcv = inr_tag_rcv,
++	.overhead = INR_TAG_LEN,
++};
++
++module_dsa_tag_driver(inr_netdev_ops);
++MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_INR);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("inr");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Marian Ulbricht");
++MODULE_DESCRIPTION("TAG driver for InnoRouter Realtime HAT");
+diff --git a/net/dsa/tag_ksz.c b/net/dsa/tag_ksz.c
+index 4820dbcedfa2..ae1d5e5e2e50 100644
+--- a/net/dsa/tag_ksz.c
++++ b/net/dsa/tag_ksz.c
+@@ -83,6 +83,7 @@ static const struct dsa_device_ops ksz8795_netdev_ops = {
+ 
+ DSA_TAG_DRIVER(ksz8795_netdev_ops);
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_KSZ8795);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("ksz8795");
+ 
+ /*
+  * For Ingress (Host -> KSZ9477), 2 bytes are added before FCS.
+@@ -155,6 +156,7 @@ static const struct dsa_device_ops ksz9477_netdev_ops = {
+ 
+ DSA_TAG_DRIVER(ksz9477_netdev_ops);
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_KSZ9477);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("ksz9477");
+ 
+ #define KSZ9893_TAIL_TAG_OVERRIDE	BIT(5)
+ #define KSZ9893_TAIL_TAG_LOOKUP		BIT(6)
+@@ -189,6 +191,7 @@ static const struct dsa_device_ops ksz9893_netdev_ops = {
+ 
+ DSA_TAG_DRIVER(ksz9893_netdev_ops);
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_KSZ9893);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("ksz9893");
+ 
+ static struct dsa_tag_driver *dsa_tag_driver_array[] = {
+ 	&DSA_TAG_DRIVER_NAME(ksz8795_netdev_ops),
+diff --git a/net/dsa/tag_lan9303.c b/net/dsa/tag_lan9303.c
+index aa1318dccaf0..388ad5f17e2d 100644
+--- a/net/dsa/tag_lan9303.c
++++ b/net/dsa/tag_lan9303.c
+@@ -130,5 +130,6 @@ static const struct dsa_device_ops lan9303_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_LAN9303);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("lan9303");
+ 
+ module_dsa_tag_driver(lan9303_netdev_ops);
+diff --git a/net/dsa/tag_mtk.c b/net/dsa/tag_mtk.c
+index 59748487664f..68f705d7fc73 100644
+--- a/net/dsa/tag_mtk.c
++++ b/net/dsa/tag_mtk.c
+@@ -119,5 +119,6 @@ static const struct dsa_device_ops mtk_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_MTK);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("mtk");
+ 
+ module_dsa_tag_driver(mtk_netdev_ops);
+diff --git a/net/dsa/tag_ocelot.c b/net/dsa/tag_ocelot.c
+index 16a1afd5b8e1..1c23ab22b788 100644
+--- a/net/dsa/tag_ocelot.c
++++ b/net/dsa/tag_ocelot.c
+@@ -269,5 +269,6 @@ static const struct dsa_device_ops ocelot_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_OCELOT);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("ocelot");
+ 
+ module_dsa_tag_driver(ocelot_netdev_ops);
+diff --git a/net/dsa/tag_qca.c b/net/dsa/tag_qca.c
+index 88181b52f480..f3f97ef04781 100644
+--- a/net/dsa/tag_qca.c
++++ b/net/dsa/tag_qca.c
+@@ -96,5 +96,6 @@ static const struct dsa_device_ops qca_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_QCA);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("qca");
+ 
+ module_dsa_tag_driver(qca_netdev_ops);
+diff --git a/net/dsa/tag_rtl4_a.c b/net/dsa/tag_rtl4_a.c
+index 24375ebd684e..5900df08ec30 100644
+--- a/net/dsa/tag_rtl4_a.c
++++ b/net/dsa/tag_rtl4_a.c
+@@ -131,3 +131,4 @@ module_dsa_tag_driver(rtl4a_netdev_ops);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_RTL4_A);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("rtl4a");
+diff --git a/net/dsa/tag_sja1105.c b/net/dsa/tag_sja1105.c
+index 50496013cdb7..97282b01068b 100644
+--- a/net/dsa/tag_sja1105.c
++++ b/net/dsa/tag_sja1105.c
+@@ -369,5 +369,6 @@ static const struct dsa_device_ops sja1105_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_SJA1105);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("sja1105");
+ 
+ module_dsa_tag_driver(sja1105_netdev_ops);
+diff --git a/net/dsa/tag_trailer.c b/net/dsa/tag_trailer.c
+index 5b97ede56a0f..d005035a61c0 100644
+--- a/net/dsa/tag_trailer.c
++++ b/net/dsa/tag_trailer.c
+@@ -61,5 +61,6 @@ static const struct dsa_device_ops trailer_netdev_ops = {
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS_DSA_TAG_DRIVER(DSA_TAG_PROTO_TRAILER);
++MODULE_ALIAS_DSA_TAG_DRIVER_NAME("trailer");
+ 
+ module_dsa_tag_driver(trailer_netdev_ops);
+
+base-commit: 1ef86d0084b5fcc6910f8e9aa9a6232457444e92
+-- 
+2.30.2
+
