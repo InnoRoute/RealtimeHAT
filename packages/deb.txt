@@ -4,8 +4,6 @@ catimg
 i2c-tools
 vim
 python3-pip
-python-pip
-wiringpi
 tcpreplay
 tcpdump
 mz
@@ -15,11 +13,9 @@ bridge-utils
 cmake
 libpcre3-dev
 libssh-dev
-libpcre2-dbg
 libpcre2-dev
 libpcre3-dev
 libssh-dev
-libpcre2-dbg
 libpcre2-dev
 cmake
 libcap-dev

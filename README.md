@@ -1,25 +1,33 @@
-Real-Time HAT™
+Real-Time HAT™ for Bookworm 32bit
 ===
-Documentation and source for InnoRoutes Raspberry TSN addon HAT
 
-For further information visit our wiki: https://github.com/InnoRoute/RealtimeHAT/wiki
-
-Or download the [System Description](https://innoroute.com/download/systemdescription/). 
-
-<img src="https://github.com/InnoRoute/RealtimeHAT/wiki/pictures/rthatnewpic.jpg" alt="RealtimeHAT" width="50%"/>
-Note: All software and configuration to get your RealTime-HAT running is stored here on github, so this project will be alive forever, even if InnoRoute's server-structure changes.
-
-
-Get your RealTimeHAT™: http://innoroute.de/shop
 
 ## Clone and install
 
 ```
-git clone --depth 1 https://github.com/InnoRoute/RealtimeHAT.git
+git clone --depth 1 https://github.com/morteza1984/RealtimeHAT-Bookworm-32bit-Beta.git
 cd RealtimeHAT
 chmod +x install.sh
 ./install.sh
 ```
+## Copy bitstream
 
-## RealTime HAT with automotive 10/100Mb/s Single Pair Ethernet and TSN
-<img src="https://github.com/InnoRoute/RealtimeHAT/wiki/pictures/sp-eth-hat.png" alt="RealtimeHAT automotive" width="50%"/>
+```
+Contact InnoRoute to obtain bitstream files for your RT-HAT devices.
+Copy the files into /usr/share/InnoRoute 
+Reboot your RT-HAT.
+After login wait up to 1 minute.
+```
+
+## Testing
+
+```
+Connect Port#1 of your Realtime-HAT to the RaspberryPI.
+Connect Port#0 (RT0) to a PC that has tcpdump or wireshark or similar tools.
+Both leds of RT0 must be on now.
+For sending test frames from RT0 to the PC run:
+sudo mz RT0 -c10000  -d 20m -A rand  -a rand -b ff:ff:ff:ff:ff:ff  -p 100 "81:00:e0:01:22:f0"
+You can do the same test with RT2.
+
+
+```

@@ -4,9 +4,9 @@ source /usr/share/InnoRoute/rt_hat.conf
 
 
 
-sudo systemctl start AutoTSN
-sudo systemctl enable AutoTSN
-sleep 20
+#sudo systemctl start AutoTSN
+#sudo systemctl enable AutoTSN
+sleep 3
 sudo rmmod brcmfmac
 sudo modprobe brcmfmac roamoff=1 feature_disable=0x82000 # fix wifi connection issue
 MAC_addr=$(cat /sys/class/net/eth0/address)

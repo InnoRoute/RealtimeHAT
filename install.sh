@@ -16,6 +16,13 @@ fi
 echo -e "\033[0;32minstall recomented packages\033[0m"
 sudo apt update
 sudo apt install -y $(cat packages/deb.txt)
+
+#wiringpi
+wget https://github.com/WiringPi/WiringPi/releases/download/3.10/wiringpi_3.10_armhf.deb
+sudo apt install ./wiringpi_3.10_armhf.deb
+sudo apt install ./wiringpi_3.10_armhf.deb
+
+
 chmod +x packages/other.sh
 sudo packages/other.sh
 echo -e "\033[0;32minstalling InnoRoute scripts\033[0m"
@@ -31,15 +38,15 @@ echo -e "\033[0;32menable autostart scripts\033[0m"
 sudo update-rc.d INR_FPGA_load defaults
 echo -e "\033[0;32minstall custom kernel\033[0m"
 tar xfv kernel/kernel.tar.gz
-sudo cp -v -r output/boot/* /boot/
+sudo cp -v -r output/boot/* /boot/firmware/
 sudo cp -v -r output/ext4/lib/modules/* /lib/modules/
 sudo depmod
 echo -e "\033[0;32menable modules\033[0m"
 cat packages/modules.txt | sudo tee -a /etc/modules
 echo -e "\033[0;32mmodify config.txt\033[0m"
-cat boot/config.txt | sudo tee -a /boot/config.txt
+cat boot/config.txt | sudo tee -a /boot/firmware/config.txt
 echo -e "\033[0;32mcopy devicetree overlay\033[0m"
-sudo cp boot/*.dtbo /boot/overlays/
+sudo cp boot/*.dtbo /boot/firmware/overlays/
 echo -e "\033[0;32mcleanup\033[0m"
 sudo rm -r output
 echo -e "\033[0;32mrebooting...\033[0m"
